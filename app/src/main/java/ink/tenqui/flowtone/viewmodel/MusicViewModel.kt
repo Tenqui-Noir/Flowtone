@@ -27,6 +27,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val audioScanner = AudioScanner(application.contentResolver)
     private val playbackController = PlaybackController(application)
     private val _uiState = MutableStateFlow(MusicUiState())
+    private var playbackQueue: List<Song> = emptyList()
+    private var currentQueueIndex: Int = -1
 
     val uiState: StateFlow<MusicUiState> = _uiState.asStateFlow()
     val playbackState: StateFlow<PlaybackState> = playbackController.playbackState
@@ -62,6 +64,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { currentState ->
                 result.fold(
                     onSuccess = { songs ->
+                        playbackQueue = songs
                         currentState.copy(
                             isLoading = false,
                             songs = songs,
@@ -82,6 +85,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playSong(song: Song) {
+        val queue = _uiState.value.songs
+        val songIndex = queue.indexOfFirst { it.id == song.id }
+        if (songIndex == -1) {
+            playbackQueue = listOf(song)
+            playSongAt(index = 0)
+            return
+        }
+
+        playbackQueue = queue
+        playSongAt(index = songIndex)
+    }
+
+    private fun playSongAt(index: Int) {
+        val song = playbackQueue.getOrNull(index) ?: return
+        currentQueueIndex = index
         playbackController.play(song)
     }
 
