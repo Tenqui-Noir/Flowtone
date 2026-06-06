@@ -122,6 +122,20 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         playbackController.togglePlayPause()
     }
 
+    fun playNext() {
+        syncCurrentQueueIndex()
+        if (playbackQueue.isEmpty() || currentQueueIndex !in playbackQueue.indices) {
+            return
+        }
+
+        val nextIndex = currentQueueIndex + 1
+        if (nextIndex !in playbackQueue.indices) {
+            return
+        }
+
+        playSongAt(index = nextIndex)
+    }
+
     override fun onCleared() {
         playbackController.release()
         super.onCleared()

@@ -64,7 +64,8 @@ fun FlowtoneApp(
         bottomBar = {
             MiniPlayer(
                 playbackState = playbackState,
-                onTogglePlayPause = musicViewModel::togglePlayPause
+                onTogglePlayPause = musicViewModel::togglePlayPause,
+                onPlayNext = musicViewModel::playNext
             )
         }
     ) { innerPadding ->

@@ -19,6 +19,7 @@ import ink.tenqui.flowtone.playback.PlaybackState
 fun MiniPlayer(
     playbackState: PlaybackState,
     onTogglePlayPause: () -> Unit,
+    onPlayNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentSong = playbackState.currentSong ?: return
@@ -61,6 +62,12 @@ fun MiniPlayer(
                         "\u64ad\u653e"
                     }
                 )
+            }
+            Button(
+                modifier = Modifier.padding(start = 8.dp),
+                onClick = onPlayNext
+            ) {
+                Text(text = "\u4e0b\u4e00\u66f2")
             }
         }
     }
