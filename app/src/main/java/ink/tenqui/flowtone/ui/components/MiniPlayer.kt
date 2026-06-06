@@ -37,7 +37,7 @@ fun MiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 22.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
