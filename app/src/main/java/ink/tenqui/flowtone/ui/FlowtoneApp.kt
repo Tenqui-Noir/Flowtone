@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ink.tenqui.flowtone.permissions.currentAudioPermission
 import ink.tenqui.flowtone.permissions.hasAudioPermission
+import ink.tenqui.flowtone.ui.components.MiniPlayer
 import ink.tenqui.flowtone.ui.screens.LibraryScreen
 import ink.tenqui.flowtone.viewmodel.MusicViewModel
 
@@ -58,6 +59,12 @@ fun FlowtoneApp(
                 title = {
                     Text(text = "Flowtone")
                 }
+            )
+        },
+        bottomBar = {
+            MiniPlayer(
+                playbackState = playbackState,
+                onTogglePlayPause = musicViewModel::togglePlayPause
             )
         }
     ) { innerPadding ->

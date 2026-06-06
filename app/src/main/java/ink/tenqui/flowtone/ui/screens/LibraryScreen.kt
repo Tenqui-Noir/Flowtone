@@ -61,12 +61,6 @@ fun LibraryScreen(
         else -> LazyColumn(
             modifier = modifier.fillMaxSize()
         ) {
-            item {
-                PlaybackStatus(
-                    playbackState = playbackState,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                )
-            }
             items(
                 items = uiState.songs,
                 key = { it.id }
@@ -77,40 +71,6 @@ fun LibraryScreen(
                     onClick = onSongClick
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun PlaybackStatus(
-    playbackState: PlaybackState,
-    modifier: Modifier = Modifier
-) {
-    val currentSong = playbackState.currentSong
-    Column(modifier = modifier) {
-        Text(
-            text = if (currentSong == null) {
-                "\u5c1a\u672a\u64ad\u653e\u6b4c\u66f2"
-            } else {
-                "\u5f53\u524d\u64ad\u653e\uff1a${currentSong.title}"
-            },
-            style = MaterialTheme.typography.titleMedium
-        )
-        Text(
-            text = if (playbackState.isPlaying) {
-                "\u6b63\u5728\u64ad\u653e"
-            } else {
-                "\u5df2\u6682\u505c"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        playbackState.errorMessage?.let { errorMessage ->
-            Text(
-                text = errorMessage,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
-            )
         }
     }
 }
