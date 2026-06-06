@@ -1,8 +1,10 @@
 package ink.tenqui.flowtone.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,7 +63,11 @@ fun LibraryScreen(
         )
 
         else -> LazyColumn(
-            modifier = modifier.fillMaxSize()
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 8.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
         ) {
             items(
                 items = uiState.songs,
@@ -86,7 +92,8 @@ private fun PermissionContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -129,7 +136,8 @@ private fun CenterMessage(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 28.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
