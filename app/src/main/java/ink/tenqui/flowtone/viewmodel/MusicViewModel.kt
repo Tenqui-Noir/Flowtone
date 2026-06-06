@@ -65,6 +65,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 result.fold(
                     onSuccess = { songs ->
                         playbackQueue = songs
+                        syncCurrentQueueIndex()
                         currentState.copy(
                             isLoading = false,
                             songs = songs,
@@ -86,7 +87,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playSong(song: Song) {
         val queue = _uiState.value.songs
-        val songIndex = queue.indexOfFirst { it.id == song.id }
+        val songIndex = queue.indexOfFirst { it.id == song.id || it.uri == song.uri }
         if (songIndex == -1) {
             playbackQueue = listOf(song)
             playSongAt(index = 0)
@@ -98,9 +99,23 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun playSongAt(index: Int) {
-        val song = playbackQueue.getOrNull(index) ?: return
+        if (playbackQueue.isEmpty() || index !in playbackQueue.indices) {
+            currentQueueIndex = -1
+            return
+        }
+
+        val song = playbackQueue[index]
         currentQueueIndex = index
         playbackController.play(song)
+    }
+
+    private fun syncCurrentQueueIndex() {
+        val currentSong = playbackState.value.currentSong
+        currentQueueIndex = if (currentSong == null) {
+            -1
+        } else {
+            playbackQueue.indexOfFirst { it.id == currentSong.id || it.uri == currentSong.uri }
+        }
     }
 
     fun togglePlayPause() {
