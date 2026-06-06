@@ -5,13 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ink.tenqui.flowtone.playback.PlaybackState
@@ -28,13 +30,14 @@ fun MiniPlayer(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        tonalElevation = 3.dp,
-        color = MaterialTheme.colorScheme.surfaceContainer
+        tonalElevation = 6.dp,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
@@ -45,6 +48,7 @@ fun MiniPlayer(
                 Text(
                     text = currentSong.title,
                     style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -60,10 +64,10 @@ fun MiniPlayer(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(onClick = onPlayPrevious) {
+                OutlinedButton(onClick = onPlayPrevious) {
                     Text(text = "\u4e0a\u4e00\u66f2")
                 }
-                Button(onClick = onTogglePlayPause) {
+                FilledTonalButton(onClick = onTogglePlayPause) {
                     Text(
                         text = if (playbackState.isPlaying) {
                             "\u6682\u505c"
@@ -72,7 +76,7 @@ fun MiniPlayer(
                         }
                     )
                 }
-                Button(onClick = onPlayNext) {
+                OutlinedButton(onClick = onPlayNext) {
                     Text(text = "\u4e0b\u4e00\u66f2")
                 }
             }
