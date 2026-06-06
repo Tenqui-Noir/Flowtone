@@ -2,7 +2,7 @@
 
 ## 项目目标
 
-Flowtone 是一个 Android 本地音乐播放器。当前阶段是 Flowtone 0.2 internal：在 MVP 0.1 本地播放基础上，整理播放队列并补齐基础队列控制。
+Flowtone 是一个 Android 本地音乐播放器。当前阶段是 Flowtone 0.3 internal：在本地播放和基础播放队列之上，完成第一轮 Material 3 风格 UI 整理。
 
 ## 当前技术栈
 
@@ -14,7 +14,7 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段是 Flowtone 0.2 
 - AndroidX Media3 ExoPlayer
 - Gradle Version Catalog
 
-## 已完成内容
+## 已完成基础能力
 
 - `MainActivity` 只负责启动 Compose，并调用 `FlowtoneApp`。
 - 已声明并请求音频读取权限。
@@ -24,19 +24,7 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段是 Flowtone 0.2 
 - `ExoPlayer` 只在 `PlaybackController` 中创建，不在 Composable 中创建。
 - 已将播放控制和播放状态接入 `MusicViewModel`。
 - 点击歌曲可以播放本地音频。
-- 当前播放歌曲会在列表中高亮。
 - 底部 MiniPlayer 显示当前歌曲标题、艺术家，并支持播放 / 暂停。
-
-## MVP 0.1 已具备功能
-
-- 未授权时提示：需要音频权限才能扫描本地音乐。
-- 授权后自动扫描本地音乐。
-- 扫描中提示：正在扫描本地音乐。
-- 空列表提示：没有找到本地音乐。
-- 歌曲列表显示标题、艺术家、时长。
-- 点击歌曲后使用 Media3 ExoPlayer 播放。
-- MiniPlayer 显示当前歌曲信息。
-- MiniPlayer 支持播放 / 暂停。
 
 ## Flowtone 0.2 Internal 已完成内容
 
@@ -48,6 +36,16 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段是 Flowtone 0.2 
 - 最后一首播放结束后停止，不循环。
 - 队列为空或索引非法时不会崩溃。
 - 队列逻辑保留在 `MusicViewModel`，不写进 Composable。
+
+## Flowtone 0.3 Internal 已完成内容
+
+- 已整理 UI 状态传递：列表页只接收当前播放歌曲用于高亮，MiniPlayer 使用完整播放状态。
+- 歌曲列表项已调整为 Material 3 风格。
+- 当前播放歌曲在列表中有更清晰的高亮状态。
+- MiniPlayer 已完成视觉优化，保留贴底播放器结构。
+- 已修正 MiniPlayer 外层黑色直角底色和重复容器问题。
+- 空状态 / 无权限状态文案已优化。
+- 主页面背景、顶栏、列表区域和 MiniPlayer 的视觉层次已统一。
 
 ## 当前文件结构概览
 
@@ -81,26 +79,28 @@ app/src/main/java/ink/tenqui/flowtone/
 - Android 通知栏媒体控件。
 - MediaSessionService。
 - 耳机按钮。
-- 随机播放。
-- 单曲循环。
-- 列表循环。
+- 搜索。
 - 歌单 / 收藏。
+- 专辑封面。
 - 歌词。
-- 封面。
+- 随机播放。
+- 单曲循环 / 列表循环。
 - 播放进度条。
+- 动画和更现代的交互过渡。
 
 ## 下一阶段建议
 
-1. 先手动测试 0.2 internal：点击播放、上一曲、下一曲、自动下一首、最后一首停止。
-2. 修正手动测试中发现的崩溃、队列索引或权限兼容问题。
-3. 队列控制稳定后，再考虑后台播放、通知栏媒体控件和 MediaSessionService。
-4. 在后台播放稳定前，不扩展随机播放、循环播放、歌单 / 收藏等功能。
+1. 先手动测试 0.3 internal：权限、扫描、列表、MiniPlayer、上一曲、下一曲、自动下一首、最后一首停止。
+2. 修正手动测试中发现的 UI 边界、权限兼容或播放队列问题。
+3. 若继续做体验增强，优先考虑搜索、进度条或封面信息，但保持小步可编译。
+4. 若进入后台播放阶段，再考虑通知栏媒体控件、MediaSessionService 和耳机按钮。
 
 ## 禁止事项
 
 - 不要在 Composable 中创建或直接操作 ExoPlayer。
 - 不要把播放队列逻辑写进 Composable。
 - 不要把 UI、权限、扫描、播放控制混在同一个文件里。
+- UI 优化应保持简单，不要为了视觉效果引入复杂框架。
 - 不要引入 Hilt、Room、Navigation 等额外框架，除非后续有明确需求。
 - 不要实现后台播放、通知栏媒体控件、耳机按钮、随机播放或循环播放，除非进入对应阶段。
-- 不要在基础播放和队列控制未稳定前扩展在线音乐、账号、歌词、插件系统或复杂歌单功能。
+- 不要在基础播放和队列控制未稳定前扩展在线音乐、账号、插件系统或复杂歌单功能。
