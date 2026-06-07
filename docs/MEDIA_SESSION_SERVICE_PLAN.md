@@ -1,6 +1,6 @@
-# MediaSessionService 迁移方案
+﻿# MediaSessionService 迁移方案
 
-## 当前 v0.4 架构
+## 当前 v0.4 / v0.5.2 架构
 
 当前播放链路：
 
@@ -14,12 +14,13 @@ Composable -> MusicViewModel -> PlaybackController -> ExoPlayer
 - `MusicViewModel`：持有歌曲列表、播放队列、当前索引，处理上一曲、下一曲、自动下一首。
 - `PlaybackController`：私有持有 `ExoPlayer` 和基础 `MediaSession`，负责播放、暂停、释放播放器。
 - `ExoPlayer`：执行实际播放。
+- `FlowtoneMediaSessionService`：0.5.2 新增的空壳 Service，当前不持有播放器，不接管播放。
 
 当前边界是清楚的：UI 不直接接触 `ExoPlayer` 或 `MediaSession`。
 
-## 为什么 0.5 要考虑 MediaSessionService
+## 为什么 0.5 需要考虑 MediaSessionService
 
-基础 `MediaSession` 已能让播放器具备系统媒体会话的基础结构，但它仍然跟随当前应用进程和 ViewModel 生命周期。
+基础 `MediaSession` 已能让播放器具备系统媒体会话的基础结构，但它仍然跟随当前应用界面和 ViewModel 生命周期。
 
 如果后续要稳定支持以下能力，需要引入 `MediaSessionService`：
 
@@ -28,7 +29,7 @@ Composable -> MusicViewModel -> PlaybackController -> ExoPlayer
 - 锁屏媒体区
 - 耳机按钮 / 蓝牙媒体按钮
 - 系统媒体控制器连接
-- App 前台界面销毁后仍保持播放控制入口
+- App 前台界面销毁后仍保留播放控制入口
 
 ## MediaSessionService 应负责什么
 
@@ -57,10 +58,10 @@ Composable -> MusicViewModel -> MediaController -> MediaSessionService -> ExoPla
 
 - `ExoPlayer` 仍然不能进入 Composable。
 - `MusicViewModel` 不应直接持有 `ExoPlayer`。
-- `MusicViewModel` 可以持有 `MediaController` 或通过轻量控制接口调用 `MediaController`。
+- `MusicViewModel` 可以持有 `MediaController`，或通过轻量控制接口调用 `MediaController`。
 - `MediaSessionService` 是播放器生命周期的主要所有者。
 
-## MusicViewModel 未来是否应直接操作 PlaybackController
+## MusicViewModel 未来是否应该直接操作 PlaybackController
 
 长期看不建议。
 
@@ -69,10 +70,10 @@ Composable -> MusicViewModel -> MediaController -> MediaSessionService -> ExoPla
 进入 0.5 后，建议逐步改为：
 
 ```text
-MusicViewModel -> PlaybackClient/MediaController -> MediaSessionService
+MusicViewModel -> PlaybackClient / MediaController -> MediaSessionService
 ```
 
-可以先做一个很小的控制接口，避免 ViewModel 直接依赖 Media3 细节过多。
+可以先做一个很小的控制接口，避免 ViewModel 直接依赖过多 Media3 细节。
 
 ## Activity / ViewModel 如何通过 MediaController 控制播放
 
@@ -107,23 +108,30 @@ MusicViewModel -> PlaybackClient/MediaController -> MediaSessionService
 
 ### Step 0.5.2：新增 MediaSessionService 骨架
 
+状态：已完成。
+
 目标：
 
-- 新增 `MediaSessionService` 类。
-- 在 Manifest 注册服务。
+- 新增 `FlowtoneMediaSessionService`。
+- 该类继承 `androidx.media3.session.MediaSessionService`。
+- 在 Manifest 注册服务和 `androidx.media3.session.MediaSessionService` action。
+- `onGetSession()` 暂时返回 `null`。
+- 不在 Service 中创建 `ExoPlayer`。
+- 不在 Service 中创建 `MediaSession`。
 - 不迁移现有播放逻辑。
 - 不改 UI。
 
 风险点：
 
 - Manifest 配置错误导致服务不可连接。
-- Service 生命周期不清楚。
+- 后续如果过早接管播放，可能引入生命周期问题。
 
 验收标准：
 
 - App build 成功。
 - App 内现有播放行为不变。
-- Service 可创建但不承担核心播放。
+- 当前播放仍然由 `PlaybackController` 内部 ExoPlayer 完成。
+- Service 只是骨架，不承担核心播放。
 
 ### Step 0.5.3：将 ExoPlayer / MediaSession 所有权迁移到 Service
 
