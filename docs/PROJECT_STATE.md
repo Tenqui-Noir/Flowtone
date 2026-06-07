@@ -236,6 +236,23 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段进入 Flowtone 0
 - 自然播放下一首主要由 ExoPlayer playlist 处理，`onMediaItemTransition` 会同步当前歌曲状态。
 - `Player.STATE_ENDED` 通常只在 playlist 末尾触发；此时现有 `playNext()` 会发现没有下一首并返回，因此本步不需要大改自动下一首逻辑。
 
+### Step 0.6.6：记录 playlist 接入后的真机验证结果
+
+- 本步只更新文档，未修改 Kotlin 播放逻辑或 UI。
+- 点击歌曲播放正常。
+- App 内播放 / 暂停正常。
+- App 内上一曲 / 下一曲正常。
+- 当前播放歌曲高亮正常。
+- MiniPlayer 标题 / 歌手显示正常。
+- 当前歌曲自然结束后可以继续下一首。
+- 最后一首结束后停止，不循环。
+- 系统媒体控件已能基于 ExoPlayer playlist 工作。
+- 系统媒体控件中的下一曲可用。
+- 系统媒体控件中的上一曲符合 Media3 / ExoPlayer 默认 previous 行为：当前歌曲播放超过一小段时间后，上一曲会先回到当前歌曲开头；当前歌曲接近开头时，再点上一曲会切到上一首。
+- 该上一曲行为属于 Media3 / ExoPlayer 默认行为，不作为 0.6 bug 处理。
+- `FlowtoneMediaSessionService` 仍只持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
+- `MusicViewModel` 仍是业务队列所有者。
+
 ## 当前架构
 
 ```text
@@ -299,7 +316,7 @@ app/src/main/java/ink/tenqui/flowtone/
 - Android 通知栏媒体控件。
 - 锁屏媒体区稳定支持。
 - 耳机按钮 / 蓝牙媒体按钮。
-- 系统媒体控件中的上一曲 / 下一曲控制。
+- 自定义系统媒体控件上一曲行为；当前使用 Media3 / ExoPlayer 默认 previous 行为。
 - 搜索。
 - 歌单 / 收藏。
 - 专辑封面。
@@ -311,10 +328,9 @@ app/src/main/java/ink/tenqui/flowtone/
 
 ## 下一阶段建议
 
-1. 真机验证点击歌曲、App 内上一曲 / 下一曲、自然下一首和最后一首结束行为。
-2. 观察系统媒体控件是否开始基于 ExoPlayer playlist 展示 previous / next。
-3. 继续观察系统媒体控件切歌后 App UI 高亮和 MiniPlayer 状态同步。
-4. 后续再处理通知栏媒体控件、锁屏媒体区、耳机按钮和蓝牙媒体按钮。
+1. 将当前状态作为 0.6 playlist 接入验证完成状态。
+2. 后续再处理通知栏媒体控件、锁屏媒体区、耳机按钮和蓝牙媒体按钮。
+3. 如未来产品上需要覆盖 Media3 / ExoPlayer 默认 previous 行为，再单独设计自定义控制方案。
 
 ## 禁止事项
 

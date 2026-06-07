@@ -204,11 +204,20 @@ playQueue(songs, startIndex)
 
 #### Step 0.6.6
 
-- 继续真机验证系统媒体控件 previous / next 展示。
-- 继续检查系统媒体控件切歌后 App UI 状态同步。
-- 重点观察当前歌曲高亮和 MiniPlayer 当前歌曲信息。
-- 如状态同步仍不足，再根据 `MediaController` 当前 `MediaItem.mediaId` 继续补齐映射。
-- 不在验证前处理复杂 UI 改造。
+- 状态：已完成 playlist 接入后的真机验证记录。
+- 点击歌曲播放正常。
+- App 内播放 / 暂停正常。
+- App 内上一曲 / 下一曲正常。
+- 当前播放歌曲高亮正常。
+- MiniPlayer 标题 / 歌手显示正常。
+- 当前歌曲自然结束后可以继续下一首。
+- 最后一首结束后停止，不循环。
+- 系统媒体控件已能基于 ExoPlayer playlist 工作。
+- 系统媒体控件中的下一曲可用。
+- 系统媒体控件中的上一曲符合 Media3 / ExoPlayer 默认 previous 行为：当前歌曲播放超过一小段时间后，上一曲会先回到当前歌曲开头；当前歌曲接近开头时，再点上一曲会切到上一首。
+- 该上一曲行为属于 Media3 / ExoPlayer 默认行为，不作为 0.6 bug 处理。
+- `FlowtoneMediaSessionService` 仍只持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
+- `MusicViewModel` 仍是业务队列所有者。
 
 ### 当前禁止事项
 
