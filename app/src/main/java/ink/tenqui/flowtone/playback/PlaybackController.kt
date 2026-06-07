@@ -1,7 +1,6 @@
 package ink.tenqui.flowtone.playback
 
 import android.content.Context
-import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -52,7 +51,7 @@ class PlaybackController(
 
     fun play(song: Song) {
         runCatching {
-            val mediaItem = MediaItem.fromUri(song.uri)
+            val mediaItem = song.toMediaItem()
             player.setMediaItem(mediaItem)
             player.prepare()
             player.play()
