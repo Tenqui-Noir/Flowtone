@@ -212,6 +212,18 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段进入 Flowtone 0
 - `release()` 会同时清空 `pendingSong`、`pendingQueueSongs` 和 `pendingQueueStartIndex`。
 - 本步未修改 `MusicViewModel`，未接 UI，当前 App 点击歌曲播放逻辑不变。
 
+### Step 0.6.4：建立 MediaItem 变化到 ViewModel 的同步通道
+
+- 已在 `PlaybackController` 的 `Player.Listener` 中监听 `onMediaItemTransition(mediaItem, reason)`。
+- 当当前 `MediaItem` 变化且 `mediaId` 非空时，`PlaybackController` 会通过回调上报 `mediaId`。
+- `MusicViewModel` 初始化 `PlaybackController` 时注册 `onMediaItemChanged` 回调。
+- `MusicViewModel` 收到 `mediaId` 后，会在 `playbackQueue` 中按 `Song.id` 查找对应歌曲。
+- 找到歌曲后，`MusicViewModel` 会同步 `currentQueueIndex`，并让 `PlaybackController` 更新 `PlaybackState.currentSong`。
+- `mediaId` 为空、无法转换为 Long、或在 `playbackQueue` 中找不到对应歌曲时会直接忽略，不崩溃。
+- 本步没有把点击歌曲播放改成 `playQueue`。
+- 本步没有修改 Composable 或 UI。
+- `FlowtoneMediaSessionService` 仍只负责持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
+
 ## 当前架构
 
 ```text
@@ -287,9 +299,9 @@ app/src/main/java/ink/tenqui/flowtone/
 
 ## 下一阶段建议
 
-1. 0.6.3 新增 `PlaybackController.playQueue(songs, startIndex)`，只建立队列播放入口，不接 UI。
-2. 0.6.4 让 `MusicViewModel` 点击歌曲时调用 `playQueue`，验证系统媒体控件 previous / next 展示。
-3. 0.6.5 处理系统媒体控件切歌后 App UI 高亮和 MiniPlayer 状态同步。
+1. 下一步让 `MusicViewModel` 点击歌曲时调用 `playQueue`，验证系统媒体控件 previous / next 展示。
+2. 继续观察系统媒体控件切歌后 App UI 高亮和 MiniPlayer 状态同步。
+3. 如果状态同步仍不足，再根据 `MediaController` 当前 `MediaItem.mediaId` 继续补齐映射。
 4. 后续再处理通知栏媒体控件、锁屏媒体区、耳机按钮和蓝牙媒体按钮。
 
 ## 禁止事项

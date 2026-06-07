@@ -27,7 +27,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val audioScanner = AudioScanner(application.contentResolver)
     private val playbackController = PlaybackController(
         context = application,
-        onPlaybackEnded = ::playNext
+        onPlaybackEnded = ::playNext,
+        onMediaItemChanged = ::syncCurrentSongFromMediaId
     )
     private val _uiState = MutableStateFlow(MusicUiState())
     private var playbackQueue: List<Song> = emptyList()
@@ -119,6 +120,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             playbackQueue.indexOfFirst { it.id == currentSong.id || it.uri == currentSong.uri }
         }
+    }
+
+    private fun syncCurrentSongFromMediaId(mediaId: String) {
+        val songId = mediaId.toLongOrNull() ?: return
+        val songIndex = playbackQueue.indexOfFirst { it.id == songId }
+        if (songIndex == -1) {
+            return
+        }
+
+        currentQueueIndex = songIndex
+        playbackController.updateCurrentSong(playbackQueue[songIndex])
     }
 
     fun togglePlayPause() {

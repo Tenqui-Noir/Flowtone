@@ -180,10 +180,14 @@ playQueue(songs, startIndex)
 
 #### Step 0.6.4
 
-- 让 `MusicViewModel` 点击歌曲时调用 `playQueue(songs, startIndex)`。
-- 保留 `MusicViewModel` 的 `playbackQueue` 和 `currentQueueIndex`。
-- 验证 App 内点击播放、上一曲、下一曲、自动下一首。
-- 验证系统媒体控件是否开始展示 previous / next。
+- 状态：已调整为先建立同步通道，暂不接 `playQueue`。
+- 已在 `PlaybackController` 中监听 `Player.Listener.onMediaItemTransition(mediaItem, reason)`。
+- `PlaybackController` 会把非空 `mediaId` 通过 `onMediaItemChanged` 回调通知 `MusicViewModel`。
+- `MusicViewModel` 根据 `mediaId` 在 `playbackQueue` 中查找 `Song`。
+- 找到后同步 `currentQueueIndex`，并更新 `PlaybackState.currentSong`。
+- 找不到、空 `mediaId` 或无法转换为 Long 时直接忽略。
+- 本步不把点击歌曲播放改成 `playQueue`，当前 App 播放行为保持不变。
+- 后续再让 `MusicViewModel` 点击歌曲时调用 `playQueue(songs, startIndex)`。
 
 #### Step 0.6.5
 

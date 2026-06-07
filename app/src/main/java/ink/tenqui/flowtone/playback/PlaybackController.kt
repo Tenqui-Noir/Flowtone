@@ -2,6 +2,7 @@ package ink.tenqui.flowtone.playback
 
 import android.content.Context
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -13,7 +14,8 @@ import kotlinx.coroutines.flow.update
 
 class PlaybackController(
     context: Context,
-    private val onPlaybackEnded: () -> Unit
+    private val onPlaybackEnded: () -> Unit,
+    private val onMediaItemChanged: (String) -> Unit = {}
 ) {
     private val mediaControllerConnection = FlowtoneMediaControllerConnection(context.applicationContext)
     private val _playbackState = MutableStateFlow(PlaybackState())
@@ -46,6 +48,13 @@ class PlaybackController(
                     it.copy(isPlaying = false)
                 }
                 onPlaybackEnded()
+            }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val mediaId = mediaItem?.mediaId
+            if (!mediaId.isNullOrBlank()) {
+                onMediaItemChanged(mediaId)
             }
         }
     }
@@ -160,6 +169,12 @@ class PlaybackController(
                     errorMessage = error.message ?: "\u64ad\u653e\u5931\u8d25"
                 )
             }
+        }
+    }
+
+    fun updateCurrentSong(song: Song) {
+        _playbackState.update {
+            it.copy(currentSong = song)
         }
     }
 
