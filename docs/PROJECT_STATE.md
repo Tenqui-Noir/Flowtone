@@ -2,7 +2,7 @@
 
 ## 项目目标
 
-Flowtone 是一个 Android 本地音乐播放器。当前阶段进入 Flowtone 0.6 调查期：0.5 已完成后台播放核心链路，0.6 将围绕系统媒体控件、通知栏、锁屏媒体区、耳机按钮 / 蓝牙按钮做分步分析和实现。
+Flowtone 是一个 Android 本地音乐播放器。当前阶段已完成 Flowtone 0.6 收尾记录，准备 `v0.6-internal` tag。0.6 的目标是完善系统媒体控件基础体验，重点是让系统侧能看到完整 ExoPlayer playlist。
 
 ## 当前技术栈
 
@@ -253,6 +253,55 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段进入 Flowtone 0
 - `FlowtoneMediaSessionService` 仍只持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
 - `MusicViewModel` 仍是业务队列所有者。
 
+### Flowtone 0.6 Internal 总结
+
+0.6 目标：
+
+- 完善系统媒体控件基础体验。
+- 重点让系统侧能看到完整 playlist，而不是只看到当前单曲 `MediaItem`。
+
+0.6 已完成：
+
+- `PlaybackController.playQueue(songs, startIndex)`。
+- `playQueue` 使用 `MediaController.setMediaItems(...)` 同步完整 playlist。
+- `playQueue` 支持简单 pending queue，避免 `MediaController` 未连接时丢弃首次队列播放请求。
+- `PlaybackController` 监听 `onMediaItemTransition`。
+- `MusicViewModel` 根据 `mediaId` 同步 `currentQueueIndex` 和当前歌曲状态。
+- `MusicViewModel.playSongAt(index)` 已切换为 `PlaybackController.playQueue(playbackQueue, index)`。
+- ExoPlayer / MediaSessionService 已获得完整 playlist。
+- 系统媒体控件下一曲可用。
+- 系统媒体控件上一曲符合 Media3 / ExoPlayer 默认 previous 行为。
+- 当前歌曲自然结束后可以继续下一首。
+- 最后一首结束后停止，不循环。
+
+0.6 保持不变：
+
+- `MusicViewModel` 仍是业务队列所有者。
+- `FlowtoneMediaSessionService` 仍只持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
+- Composable 仍不接触 `ExoPlayer`、`MediaSession` 或 `MediaController`。
+- 未引入 Hilt、Room、Navigation。
+- 未做 UI 大改。
+
+0.6 真机验证结果：
+
+- 点击歌曲播放正常。
+- App 内播放 / 暂停正常。
+- App 内上一曲 / 下一曲正常。
+- MiniPlayer 显示正常。
+- 列表当前播放高亮正常。
+- 后台播放保持正常。
+- 系统媒体控件下一曲可用。
+- 系统媒体控件上一曲行为符合预期：播放超过一小段时间后先回到当前歌曲开头，接近开头时再点会切到上一首。
+
+0.7 候选方向：
+
+- 播放进度条。
+- 专辑封面。
+- 通知栏 / 锁屏 metadata 进一步完善。
+- 耳机按钮 / 蓝牙按钮专项验证。
+- 搜索。
+- 播放模式：随机、单曲循环、列表循环。
+
 ## 当前架构
 
 ```text
@@ -328,8 +377,8 @@ app/src/main/java/ink/tenqui/flowtone/
 
 ## 下一阶段建议
 
-1. 将当前状态作为 0.6 playlist 接入验证完成状态。
-2. 后续再处理通知栏媒体控件、锁屏媒体区、耳机按钮和蓝牙媒体按钮。
+1. 可以基于当前状态打 `v0.6-internal` tag。
+2. 0.7 可从播放进度条、专辑封面、通知栏 / 锁屏 metadata、耳机 / 蓝牙按钮、搜索或播放模式中选择一个方向分步推进。
 3. 如未来产品上需要覆盖 Media3 / ExoPlayer 默认 previous 行为，再单独设计自定义控制方案。
 
 ## 禁止事项

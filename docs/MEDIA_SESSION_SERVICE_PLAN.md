@@ -219,6 +219,56 @@ playQueue(songs, startIndex)
 - `FlowtoneMediaSessionService` 仍只持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
 - `MusicViewModel` 仍是业务队列所有者。
 
+### Flowtone 0.6 Internal 收尾总结
+
+0.6 目标：
+
+- 完善系统媒体控件基础体验。
+- 让系统侧能基于 ExoPlayer playlist 获得 previous / next 能力。
+- 保持业务队列所有权仍在 `MusicViewModel`，避免一次性迁移到 Service。
+
+0.6 已完成：
+
+- `PlaybackController.playQueue(songs, startIndex)`。
+- `playQueue` 使用 `MediaController.setMediaItems(...)` 同步完整 playlist。
+- `playQueue` 支持简单 pending queue。
+- `PlaybackController` 监听 `onMediaItemTransition`。
+- `MusicViewModel` 根据 `mediaId` 同步 `currentQueueIndex`。
+- `MusicViewModel.playSongAt(index)` 已切换为 `playQueue(playbackQueue, index)`。
+- ExoPlayer / MediaSessionService 已获得完整 playlist。
+- 系统媒体控件下一曲可用。
+- 系统媒体控件上一曲符合 Media3 / ExoPlayer 默认 previous 行为。
+- 当前歌曲自然结束后继续下一首。
+- 最后一首结束后停止，不循环。
+
+0.6 保持不变：
+
+- `MusicViewModel` 仍是业务队列所有者。
+- `FlowtoneMediaSessionService` 仍只持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
+- Composable 不接触 `ExoPlayer`、`MediaSession` 或 `MediaController`。
+- 未引入 Hilt、Room、Navigation。
+- 未做 UI 大改。
+
+0.6 真机验证结果：
+
+- 点击歌曲播放正常。
+- App 内播放 / 暂停正常。
+- App 内上一曲 / 下一曲正常。
+- MiniPlayer 正常。
+- 列表高亮正常。
+- 后台播放保持正常。
+- 系统媒体控件下一曲可用。
+- 系统媒体控件上一曲行为符合预期。
+
+0.7 候选方向：
+
+- 播放进度条。
+- 专辑封面。
+- 通知栏 / 锁屏 metadata 进一步完善。
+- 耳机按钮 / 蓝牙按钮专项验证。
+- 搜索。
+- 播放模式：随机、单曲循环、列表循环。
+
 ### 当前禁止事项
 
 - 不迁移队列所有权到 Service。
