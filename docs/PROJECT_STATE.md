@@ -190,6 +190,18 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段进入 Flowtone 0
 - 0.6.4 再让 `MusicViewModel` 点击歌曲时调用 `playQueue`。
 - 0.6.5 再处理系统媒体控件切歌后 App UI 高亮和 MiniPlayer 状态同步问题。
 
+### Step 0.6.3：新增 PlaybackController.playQueue 入口
+
+- 已在 `PlaybackController` 中新增 `playQueue(songs, startIndex)`。
+- 本步未修改 `MusicViewModel`，因此 App 当前点击歌曲播放逻辑仍然走现有 `play(song)`。
+- 本步未修改 Composable 或 UI。
+- `playQueue` 会对空队列和越界 `startIndex` 做直接返回保护。
+- `playQueue` 会将 `List<Song>` 转为 `List<MediaItem>`。
+- `playQueue` 使用 `MediaController.setMediaItems(mediaItems, startIndex, C.TIME_UNSET)` 设置 playlist。
+- `playQueue` 随后调用 `prepare()` 和 `play()`。
+- 当前暂不为 `playQueue` 增加复杂 pending 队列逻辑，避免影响现有 `play(song)` 的 pending 行为。
+- `FlowtoneMediaSessionService` 仍只负责持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
+
 ## 当前架构
 
 ```text

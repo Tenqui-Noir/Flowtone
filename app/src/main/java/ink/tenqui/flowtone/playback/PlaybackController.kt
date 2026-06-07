@@ -1,6 +1,7 @@
 package ink.tenqui.flowtone.playback
 
 import android.content.Context
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -107,6 +108,37 @@ class PlaybackController(
             _playbackState.update {
                 it.copy(
                     currentSong = song,
+                    isPlaying = false,
+                    errorMessage = error.message ?: "\u64ad\u653e\u5931\u8d25"
+                )
+            }
+        }
+    }
+
+    fun playQueue(songs: List<Song>, startIndex: Int) {
+        if (songs.isEmpty() || startIndex !in songs.indices) {
+            return
+        }
+
+        val controller = mediaControllerConnection.currentController ?: return
+        val mediaItems = songs.map { it.toMediaItem() }
+        val startSong = songs[startIndex]
+
+        runCatching {
+            controller.setMediaItems(mediaItems, startIndex, C.TIME_UNSET)
+            controller.prepare()
+            controller.play()
+            _playbackState.update {
+                it.copy(
+                    currentSong = startSong,
+                    isPlaying = true,
+                    errorMessage = null
+                )
+            }
+        }.onFailure { error ->
+            _playbackState.update {
+                it.copy(
+                    currentSong = startSong,
                     isPlaying = false,
                     errorMessage = error.message ?: "\u64ad\u653e\u5931\u8d25"
                 )

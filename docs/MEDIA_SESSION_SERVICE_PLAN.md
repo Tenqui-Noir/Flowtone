@@ -155,10 +155,16 @@ playQueue(songs, startIndex)
 
 #### Step 0.6.3
 
-- 新增 `PlaybackController.playQueue(songs, startIndex)`。
+- 状态：已完成。
+- 已新增 `PlaybackController.playQueue(songs, startIndex)`。
 - 只建立队列播放入口。
 - 暂时不接 UI。
 - 暂时不修改 `MusicViewModel` 点击歌曲逻辑。
+- 空队列和越界 `startIndex` 会直接返回，不崩溃。
+- `playQueue` 会将 `List<Song>` 转为 `List<MediaItem>`。
+- `playQueue` 使用 `MediaController.setMediaItems(mediaItems, startIndex, C.TIME_UNSET)` 设置 playlist。
+- `playQueue` 会调用 `prepare()` 和 `play()`。
+- 当前暂不为 `playQueue` 增加复杂 pending 队列逻辑，避免影响现有 `play(song)`。
 - 验证 build 通过。
 
 #### Step 0.6.4
