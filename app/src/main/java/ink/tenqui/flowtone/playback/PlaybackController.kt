@@ -3,8 +3,7 @@ package ink.tenqui.flowtone.playback
 import android.content.Context
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaController
 import ink.tenqui.flowtone.model.Song
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,9 +14,9 @@ class PlaybackController(
     context: Context,
     private val onPlaybackEnded: () -> Unit
 ) {
-    private val player = ExoPlayer.Builder(context.applicationContext).build()
-    private val mediaSession = MediaSession.Builder(context.applicationContext, player).build()
+    private val mediaControllerConnection = FlowtoneMediaControllerConnection(context.applicationContext)
     private val _playbackState = MutableStateFlow(PlaybackState())
+    private var pendingSong: Song? = null
     private var isReleased = false
 
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
@@ -49,15 +48,54 @@ class PlaybackController(
     }
 
     init {
-        player.addListener(listener)
+        mediaControllerConnection.connect(
+            onConnected = { controller ->
+                if (isReleased) {
+                    return@connect
+                }
+
+                controller.addListener(listener)
+                pendingSong?.let { song ->
+                    pendingSong = null
+                    play(song)
+                }
+            },
+            onConnectionFailed = { error ->
+                if (isReleased) {
+                    return@connect
+                }
+
+                if (pendingSong != null) {
+                    _playbackState.update {
+                        it.copy(
+                            isPlaying = false,
+                            errorMessage = error.message ?: "\u64ad\u653e\u5668\u8fde\u63a5\u5931\u8d25"
+                        )
+                    }
+                }
+            }
+        )
     }
 
     fun play(song: Song) {
+        val controller = mediaControllerConnection.currentController
+        if (controller == null) {
+            pendingSong = song
+            _playbackState.update {
+                it.copy(
+                    currentSong = song,
+                    isPlaying = false,
+                    errorMessage = null
+                )
+            }
+            return
+        }
+
         runCatching {
             val mediaItem = song.toMediaItem()
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            player.play()
+            controller.setMediaItem(mediaItem)
+            controller.prepare()
+            controller.play()
             _playbackState.update {
                 it.copy(
                     currentSong = song,
@@ -77,7 +115,8 @@ class PlaybackController(
     }
 
     fun play() {
-        player.play()
+        val controller = mediaControllerConnection.currentController ?: return
+        controller.play()
         _playbackState.update {
             it.copy(
                 isPlaying = true,
@@ -87,14 +126,17 @@ class PlaybackController(
     }
 
     fun pause() {
-        player.pause()
+        val controller = mediaControllerConnection.currentController ?: return
+        controller.pause()
         _playbackState.update {
             it.copy(isPlaying = false)
         }
     }
 
     fun togglePlayPause() {
-        if (player.isPlaying) {
+        val controller = mediaControllerConnection.currentController
+        val isPlaying = controller?.isPlaying ?: playbackState.value.isPlaying
+        if (isPlaying) {
             pause()
         } else {
             play()
@@ -107,8 +149,7 @@ class PlaybackController(
         }
 
         isReleased = true
-        player.removeListener(listener)
-        mediaSession.release()
-        player.release()
+        mediaControllerConnection.currentController?.removeListener(listener)
+        mediaControllerConnection.release()
     }
 }

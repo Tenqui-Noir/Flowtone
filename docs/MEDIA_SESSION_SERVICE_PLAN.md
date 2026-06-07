@@ -1,28 +1,30 @@
 ﻿# MediaSessionService 迁移方案
 
-## 当前 v0.4 / v0.5.3 架构
+## 当前 v0.5.6 架构
 
 当前播放链路：
 
 ```text
-Composable -> MusicViewModel -> PlaybackController -> ExoPlayer
+Composable -> MusicViewModel -> PlaybackController -> MediaController -> MediaSessionService -> ExoPlayer
 ```
 
 当前职责：
 
 - `Composable`：显示 UI，触发 ViewModel 方法。
 - `MusicViewModel`：持有歌曲列表、播放队列、当前索引，处理上一曲、下一曲、自动下一首。
-- `PlaybackController`：私有持有 `ExoPlayer` 和基础 `MediaSession`，负责播放、暂停、释放播放器。
-- `ExoPlayer`：执行实际播放。
-- `FlowtoneMediaSessionService`：0.5.3 已持有自己的 `ExoPlayer` 和 `MediaSession`，当前用于验证 Service 生命周期，尚未接管 App 内播放。
+- `PlaybackController`：通过 `MediaController` 控制播放，并维护 UI 所需的播放状态。
+- `FlowtoneMediaControllerConnection`：负责连接 `FlowtoneMediaSessionService` 并提供 `MediaController`。
+- `FlowtoneMediaSessionService`：唯一持有 `ExoPlayer` 和 `MediaSession` 的位置。
+- `ExoPlayer`：在 Service 内执行实际播放。
 
 当前边界是清楚的：UI 不直接接触 `ExoPlayer` 或 `MediaSession`。
 
-当前也是临时双播放器过渡状态：
+0.5.6 已结束临时双播放器过渡状态：
 
-- `PlaybackController` 内的播放器仍负责现有 App 内实际播放。
-- `FlowtoneMediaSessionService` 内的播放器只用于建立未来 Service 生命周期。
-- 后续步骤必须移除 `PlaybackController` 内的播放器所有权，避免长期双播放器架构。
+- `PlaybackController` 不再创建本地 `ExoPlayer`。
+- `PlaybackController` 不再创建本地 `MediaSession`。
+- 实际播放由 `FlowtoneMediaSessionService` 内部 ExoPlayer 执行。
+- 队列逻辑仍保留在 `MusicViewModel`。
 
 ## 为什么 0.5 需要考虑 MediaSessionService
 
@@ -136,7 +138,7 @@ MusicViewModel -> PlaybackClient / MediaController -> MediaSessionService
 
 - App build 成功。
 - App 内现有播放行为不变。
-- 当前播放仍然由 `PlaybackController` 内部 ExoPlayer 完成。
+- 0.5.2 当时播放仍然由 `PlaybackController` 内部 ExoPlayer 完成。
 - Service 只是骨架，不承担核心播放。
 
 ### Step 0.5.3：将 ExoPlayer / MediaSession 所有权迁移到 Service
@@ -178,6 +180,25 @@ MusicViewModel -> PlaybackClient / MediaController -> MediaSessionService
 
 ### Step 0.5.4：ViewModel 通过 MediaController 控制播放
 
+状态：准备层已完成，控制迁移尚未开始。
+
+当前 0.5.4 已完成：
+
+- 已新增 `FlowtoneMediaControllerConnection`。
+- 该连接类使用 `SessionToken` 指向 `FlowtoneMediaSessionService`。
+- 该连接类异步创建 `MediaController`。
+- 该连接类保存 controller 引用。
+- 该连接类提供 `release()` 释放 controller future / controller。
+- `PlaybackController` 当前只持有并释放该连接类。
+
+当前 0.5.4 尚未完成完整控制迁移：
+
+- `play(song)` 尚未切到 `MediaController`。
+- `pause()` / `play()` / `togglePlayPause()` 尚未切到 `MediaController`。
+- 上一曲 / 下一曲 / 自动下一首仍由 `MusicViewModel` 和现有 `PlaybackController` 播放器完成。
+- `MusicViewModel` 不直接持有 `MediaController`。
+- Composable 不接触 `MediaController`。
+
 目标：
 
 - ViewModel 不直接调用旧 `PlaybackController`。
@@ -192,11 +213,88 @@ MusicViewModel -> PlaybackClient / MediaController -> MediaSessionService
 
 验收标准：
 
-- Controller 连接成功后，所有 App 内控制正常。
-- Controller 未连接时不崩溃。
-- UI 状态和播放状态基本一致。
+- 当前阶段 App build 成功。
+- 当前阶段 App 内现有播放行为不变。
+- 当前阶段 Controller 连接失败时 App 不崩溃。
+- 后续完整迁移后，Controller 连接成功时所有 App 内控制正常。
+- 后续完整迁移后，Controller 未连接时不崩溃。
+- 后续完整迁移后，UI 状态和播放状态基本一致。
 
-### Step 0.5.5：处理通知栏媒体控件
+### Step 0.5.4.1：修复临时双 MediaSession 的 session id 冲突
+
+状态：已完成。
+
+已完成内容：
+
+- `PlaybackController` 内的过渡期 `MediaSession` 设置显式 id：`flowtone_local_transition_session`。
+- `FlowtoneMediaSessionService` 内的 `MediaSession` 设置显式 id：`flowtone_service_session`。
+- 修复两个 `MediaSession` 都使用默认空 id 时触发的 `Session ID must be unique` 崩溃。
+- 当前播放控制仍然没有切到 `MediaController`。
+- 0.5.4.1 当时实际播放仍由 `PlaybackController` 内部 ExoPlayer 完成。
+
+过渡期约束：
+
+- 只要 App 内同时存在多个 `MediaSession`，就必须保证 session id 唯一。
+- 后续 0.5.5 迁移播放控制后，应移除 `PlaybackController` 内旧播放器 / 旧 Session 所有权。
+- 不应长期保留双播放器 / 双 Session / 双控制架构。
+
+验收标准：
+
+- App build 成功。
+- 真机启动不再因 `Session ID must be unique` 崩溃。
+- App 内播放、暂停、上一曲、下一曲、自动下一首行为不变。
+
+### Step 0.5.5：补齐媒体播放前台服务 Manifest 声明
+
+状态：已完成。
+
+目标：
+
+- 在实际迁移播放前，让 Manifest 先符合未来媒体播放前台服务要求。
+- 添加 `android.permission.FOREGROUND_SERVICE`。
+- 添加 `android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK`。
+- 为 `FlowtoneMediaSessionService` 添加 `android:foregroundServiceType="mediaPlayback"`。
+- 保留 `androidx.media3.session.MediaSessionService` intent action。
+- 不新增 `POST_NOTIFICATIONS` 权限，通知权限留到通知栏阶段处理。
+- 不迁移现有播放逻辑。
+- 不新增通知栏媒体控件。
+- 不新增后台播放。
+
+风险点：
+
+- Android 版本对前台服务类型和权限要求不同。
+- 如果后续真正启动前台服务，还需要严格处理通知和服务生命周期。
+- 本步只是声明准备，不代表已经具备后台播放能力。
+
+验收标准：
+
+- App build 成功。
+- App 内现有播放行为不变。
+- 0.5.5 当时实际播放仍由 `PlaybackController` 内部 ExoPlayer 完成。
+- UI 肉眼表现不变。
+
+### Step 0.5.6：处理通知栏媒体控件
+
+状态：播放迁移已完成，通知栏媒体控件尚未开始。
+
+当前 0.5.6 已完成：
+
+- `PlaybackController` 的实际播放控制已迁移到 `MediaController`。
+- `play(song)` 会通过 `Song.toMediaItem()` 得到 `MediaItem`。
+- `play(song)` 通过 `MediaController.setMediaItem()`、`prepare()`、`play()` 播放。
+- `pause()` 通过 `MediaController.pause()` 执行。
+- `play()` / 恢复播放通过 `MediaController.play()` 执行。
+- 播放结束监听迁移到 `MediaController` 的 `Player.Listener`。
+- `Player.STATE_ENDED` 时仍调用现有 `onPlaybackEnded`，让 `MusicViewModel` 继续负责自动下一首。
+- 如果 `MediaController` 尚未连接完成，`PlaybackController` 会暂存最近一次要播放的歌曲，并在连接完成后播放。
+- 双播放器过渡状态已结束。
+
+当前仍未完成：
+
+- 尚未实现通知栏媒体控件。
+- 尚未实现真正后台播放。
+- 尚未迁移队列所有权。
+- 尚未把队列改成 ExoPlayer playlist。
 
 目标：
 
@@ -211,12 +309,15 @@ MusicViewModel -> PlaybackClient / MediaController -> MediaSessionService
 
 验收标准：
 
+- 当前阶段 App build 成功。
+- 当前阶段 App 内播放、暂停、上一曲、下一曲、自动下一首正常。
+- 当前阶段 `FlowtoneMediaSessionService` 是唯一持有 `ExoPlayer` 和 `MediaSession` 的位置。
 - 前台播放时通知栏媒体控件可见。
 - 播放 / 暂停可控制。
 - 标题 / 歌手正确。
 - 不影响 App 内 MiniPlayer。
 
-### Step 0.5.6：后台播放和外部按钮验证
+### Step 0.5.7：后台播放和外部按钮验证
 
 目标：
 
