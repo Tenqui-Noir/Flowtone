@@ -18,6 +18,7 @@ class PlaybackController(
     private val player = ExoPlayer.Builder(context.applicationContext).build()
     private val mediaSession = MediaSession.Builder(context.applicationContext, player).build()
     private val _playbackState = MutableStateFlow(PlaybackState())
+    private var isReleased = false
 
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
@@ -101,6 +102,11 @@ class PlaybackController(
     }
 
     fun release() {
+        if (isReleased) {
+            return
+        }
+
+        isReleased = true
         player.removeListener(listener)
         mediaSession.release()
         player.release()
