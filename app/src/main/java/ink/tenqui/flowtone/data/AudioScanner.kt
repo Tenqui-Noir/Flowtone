@@ -2,6 +2,7 @@ package ink.tenqui.flowtone.data
 
 import android.content.ContentResolver
 import android.content.ContentUris
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import ink.tenqui.flowtone.model.Song
@@ -20,6 +21,7 @@ class AudioScanner(
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.DURATION,
+            MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.IS_MUSIC
         )
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > ?"
@@ -38,6 +40,7 @@ class AudioScanner(
             val titleColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
             val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
             val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+            val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
@@ -45,6 +48,14 @@ class AudioScanner(
                 val artist = cursor.getString(artistColumn).orEmpty().ifBlank { "\u672a\u77e5\u827a\u672f\u5bb6" }
                 val durationMs = cursor.getLong(durationColumn)
                 val uri = ContentUris.withAppendedId(contentUri, id)
+                val albumId = if (cursor.isNull(albumIdColumn)) {
+                    null
+                } else {
+                    cursor.getLong(albumIdColumn)
+                }
+                val artworkUri = albumId?.let {
+                    ContentUris.withAppendedId(ALBUM_ART_BASE_URI, it)
+                }
 
                 songs.add(
                     Song(
@@ -52,7 +63,9 @@ class AudioScanner(
                         title = title,
                         artist = artist,
                         durationMs = durationMs,
-                        uri = uri
+                        uri = uri,
+                        albumId = albumId,
+                        artworkUri = artworkUri
                     )
                 )
             }
@@ -63,5 +76,6 @@ class AudioScanner(
 
     private companion object {
         const val MIN_MUSIC_DURATION_MS = 30_000L
+        val ALBUM_ART_BASE_URI: Uri = Uri.parse("content://media/external/audio/albumart")
     }
 }

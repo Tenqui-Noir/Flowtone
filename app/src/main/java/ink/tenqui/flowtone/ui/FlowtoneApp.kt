@@ -2,6 +2,15 @@ package ink.tenqui.flowtone.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,9 +25,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ink.tenqui.flowtone.permissions.currentAudioPermission
 import ink.tenqui.flowtone.permissions.hasAudioPermission
@@ -37,6 +51,26 @@ fun FlowtoneApp(
     var permissionDenied by remember {
         mutableStateOf(false)
     }
+    var miniPlayerExpanded by rememberSaveable {
+        mutableStateOf(false)
+    }
+    val backgroundBlurProgress by animateFloatAsState(
+        targetValue = if (miniPlayerExpanded) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 300,
+            easing = FastOutSlowInEasing
+        ),
+        label = "MiniPlayerBackgroundBlurProgress"
+    )
+    val backgroundBlurRadius by animateDpAsState(
+        targetValue = if (miniPlayerExpanded) 12.dp else 0.dp,
+        animationSpec = tween(
+            durationMillis = 300,
+            easing = FastOutSlowInEasing
+        ),
+        label = "MiniPlayerBackgroundBlur"
+    )
+    val noRippleInteractionSource = remember { MutableInteractionSource() }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -55,42 +89,62 @@ fun FlowtoneApp(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                title = {
-                    Text(text = "Flowtone")
-                },
-                expandedHeight = TopAppBarDefaults.TopAppBarExpandedHeight
-            )
-        },
-        bottomBar = {
-            MiniPlayer(
-                playbackState = playbackState,
-                onTogglePlayPause = musicViewModel::togglePlayPause,
-                onPlayPrevious = musicViewModel::playPrevious,
-                onPlayNext = musicViewModel::playNext
-            )
-        }
-    ) { innerPadding ->
-        LibraryScreen(
-            uiState = uiState,
-            currentSong = playbackState.currentSong,
-            permissionDenied = permissionDenied,
-            onRequestPermission = {
-                permissionLauncher.launch(currentAudioPermission())
-            },
-            onSongClick = { song ->
-                musicViewModel.playSong(song)
-            },
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .blur(backgroundBlurRadius),
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0),
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    title = {
+                        Text(text = "Flowtone")
+                    },
+                    expandedHeight = TopAppBarDefaults.TopAppBarExpandedHeight
+                )
+            }
+        ) { innerPadding ->
+            LibraryScreen(
+                uiState = uiState,
+                currentSong = playbackState.currentSong,
+                permissionDenied = permissionDenied,
+                onRequestPermission = {
+                    permissionLauncher.launch(currentAudioPermission())
+                },
+                onSongClick = { song ->
+                    musicViewModel.playSong(song)
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            )
+        }
+        if (backgroundBlurProgress > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.18f * backgroundBlurProgress))
+                    .clickable(
+                        interactionSource = noRippleInteractionSource,
+                        indication = null
+                    ) {
+                        miniPlayerExpanded = false
+                    }
+            )
+        }
+        MiniPlayer(
+            playbackState = playbackState,
+            expanded = miniPlayerExpanded,
+            onExpandedChange = { miniPlayerExpanded = it },
+            onTogglePlayPause = musicViewModel::togglePlayPause,
+            onPlayPrevious = musicViewModel::playPrevious,
+            onPlayNext = musicViewModel::playNext,
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 }
