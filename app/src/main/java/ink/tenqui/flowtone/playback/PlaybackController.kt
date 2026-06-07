@@ -18,6 +18,8 @@ class PlaybackController(
     private val mediaControllerConnection = FlowtoneMediaControllerConnection(context.applicationContext)
     private val _playbackState = MutableStateFlow(PlaybackState())
     private var pendingSong: Song? = null
+    private var pendingQueueSongs: List<Song>? = null
+    private var pendingQueueStartIndex: Int? = null
     private var isReleased = false
 
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
@@ -56,6 +58,15 @@ class PlaybackController(
                 }
 
                 controller.addListener(listener)
+                val queuedSongs = pendingQueueSongs
+                val queuedStartIndex = pendingQueueStartIndex
+                if (queuedSongs != null && queuedStartIndex != null) {
+                    pendingQueueSongs = null
+                    pendingQueueStartIndex = null
+                    playQueue(queuedSongs, queuedStartIndex)
+                    return@connect
+                }
+
                 pendingSong?.let { song ->
                     pendingSong = null
                     play(song)
@@ -120,7 +131,13 @@ class PlaybackController(
             return
         }
 
-        val controller = mediaControllerConnection.currentController ?: return
+        val controller = mediaControllerConnection.currentController
+        if (controller == null) {
+            pendingQueueSongs = songs
+            pendingQueueStartIndex = startIndex
+            return
+        }
+
         val mediaItems = songs.map { it.toMediaItem() }
         val startSong = songs[startIndex]
 
@@ -182,6 +199,8 @@ class PlaybackController(
 
         isReleased = true
         pendingSong = null
+        pendingQueueSongs = null
+        pendingQueueStartIndex = null
         mediaControllerConnection.currentController?.removeListener(listener)
         mediaControllerConnection.release()
     }

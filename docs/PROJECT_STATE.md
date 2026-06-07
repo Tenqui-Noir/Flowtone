@@ -202,6 +202,16 @@ Flowtone 是一个 Android 本地音乐播放器。当前阶段进入 Flowtone 0
 - 当前暂不为 `playQueue` 增加复杂 pending 队列逻辑，避免影响现有 `play(song)` 的 pending 行为。
 - `FlowtoneMediaSessionService` 仍只负责持有 `ExoPlayer + MediaSession`，不主动管理业务队列。
 
+### Step 0.6.3.1：为 playQueue 增加简单 pending queue
+
+- 已为 `PlaybackController.playQueue(songs, startIndex)` 增加简单 pending queue 支持。
+- 当 `MediaController` 尚未连接完成时，`playQueue` 会保存最近一次 `songs` 和 `startIndex`。
+- pending queue 只保留最近一次请求，不实现复杂队列缓存。
+- `MediaController` 连接完成后，优先执行 pending queue。
+- 如果没有 pending queue，再执行现有 `pendingSong`。
+- `release()` 会同时清空 `pendingSong`、`pendingQueueSongs` 和 `pendingQueueStartIndex`。
+- 本步未修改 `MusicViewModel`，未接 UI，当前 App 点击歌曲播放逻辑不变。
+
 ## 当前架构
 
 ```text

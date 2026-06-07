@@ -167,6 +167,17 @@ playQueue(songs, startIndex)
 - 当前暂不为 `playQueue` 增加复杂 pending 队列逻辑，避免影响现有 `play(song)`。
 - 验证 build 通过。
 
+#### Step 0.6.3.1
+
+- 状态：已完成。
+- 已为 `PlaybackController.playQueue(songs, startIndex)` 增加简单 pending queue 支持。
+- 当 `MediaController` 尚未连接完成时，保存最近一次 `songs` 和 `startIndex`。
+- pending queue 只保留最近一次请求，不做复杂队列缓存。
+- `MediaController` 连接完成后，优先执行 pending queue。
+- 如果没有 pending queue，再执行原有 `pendingSong`。
+- `release()` 会同时清空 pending queue 和 `pendingSong`。
+- 暂时不修改 `MusicViewModel`，不接 UI。
+
 #### Step 0.6.4
 
 - 让 `MusicViewModel` 点击歌曲时调用 `playQueue(songs, startIndex)`。
