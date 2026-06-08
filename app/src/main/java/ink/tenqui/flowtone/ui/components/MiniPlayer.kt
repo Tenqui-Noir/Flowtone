@@ -1,8 +1,15 @@
 package ink.tenqui.flowtone.ui.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -40,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -53,13 +62,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.palette.graphics.Palette
 import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
 import coil3.request.crossfade
+import coil3.toBitmap
 import ink.tenqui.flowtone.playback.PlaybackState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val MINI_PLAYER_ANIMATION_DURATION_MS = 300
+private val MiniPlayerEasing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+private val SoftElementEasing = CubicBezierEasing(0.16f, 1.0f, 0.3f, 1.0f)
+private val HeavyElementEasing = CubicBezierEasing(0.3f, 0.0f, 0.0f, 1.0f)
 
 @Composable
 fun MiniPlayer(
@@ -108,7 +126,6 @@ fun MiniPlayer(
         label = "MiniPlayerProgress"
     )
     val currentHeight = collapsedHeight + (expandedHeight - collapsedHeight) * animationProgress
-    val coverScale = 1f + (1.18f - 1f) * animationProgress
     val hasArtworkBackground = currentSong.artworkUri != null
     val backgroundImageRequest: ImageRequest? = remember(currentSong.artworkUri, context) {
         currentSong.artworkUri?.let { artworkUri ->
@@ -128,11 +145,60 @@ fun MiniPlayer(
                 .build()
         }
     }
+    val paletteImageRequest: ImageRequest? = remember(currentSong.artworkUri, context) {
+        currentSong.artworkUri?.let { artworkUri ->
+            ImageRequest.Builder(context)
+                .data(artworkUri)
+                .size(128, 128)
+                .allowHardware(false)
+                .crossfade(false)
+                .build()
+        }
+    }
     LaunchedEffect(coverImageRequest) {
         coverImageRequest?.let { request ->
             context.imageLoader.enqueue(request)
         }
     }
+    val fallbackCloudColors = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.secondaryContainer,
+        MaterialTheme.colorScheme.tertiaryContainer
+    )
+    var extractedCloudColors by remember {
+        mutableStateOf<List<Color>?>(null)
+    }
+    LaunchedEffect(paletteImageRequest) {
+        extractedCloudColors = paletteImageRequest?.let { request ->
+            runCatching {
+                withContext(Dispatchers.Default) {
+                    val result = context.imageLoader.execute(request)
+                    val bitmap = (result as? SuccessResult)?.image?.toBitmap(128, 128)
+                    bitmap?.let { sourceBitmap ->
+                        val palette = Palette.from(sourceBitmap).generate()
+                        listOf(
+                            Color(
+                                palette.vibrantSwatch?.rgb
+                                    ?: palette.dominantSwatch?.rgb
+                                    ?: palette.getDominantColor(android.graphics.Color.DKGRAY)
+                            ),
+                            Color(
+                                palette.mutedSwatch?.rgb
+                                    ?: palette.darkVibrantSwatch?.rgb
+                                    ?: palette.getMutedColor(android.graphics.Color.GRAY)
+                            ),
+                            Color(
+                                palette.lightVibrantSwatch?.rgb
+                                    ?: palette.lightMutedSwatch?.rgb
+                                    ?: palette.getLightMutedColor(android.graphics.Color.LTGRAY)
+                            )
+                        )
+                    }
+                }
+            }.getOrNull()
+        }
+    }
+    val cloudColors = extractedCloudColors ?: fallbackCloudColors
     val noRippleInteractionSource = remember { MutableInteractionSource() }
     val titleColor = if (hasArtworkBackground) {
         Color.White
@@ -233,47 +299,31 @@ fun MiniPlayer(
                 contentAlignment = Alignment.BottomCenter
             ) {
                 val playerWidth = maxWidth
-                backgroundImageRequest?.let { request ->
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(expandedHeight)
-                            .graphicsLayer {
-                                scaleX = coverScale
-                                scaleY = coverScale
-                            }
-                            .blur(16.dp)
-                    ) {
-                        AsyncImage(
-                            model = request,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(Color.Black.copy(alpha = 0.55f))
-                    )
-                }
-                ExpandedArtwork(
+                FlowCloudBackground(
+                    colors = cloudColors,
+                    progress = animationProgress,
+                    modifier = Modifier.matchParentSize()
+                )
+                HiddenBlurArtworkBridge(
+                    imageRequest = backgroundImageRequest,
+                    progress = animationProgress,
+                    modifier = Modifier.matchParentSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.42f))
+                )
+                MorphArtworkLayer(
                     imageRequest = coverImageRequest,
                     progress = animationProgress,
-                    artworkSize = expandedArtworkSize,
+                    playerWidth = playerWidth,
+                    currentHeight = currentHeight,
+                    collapsedHeight = collapsedHeight,
+                    expandedArtworkSize = expandedArtworkSize,
+                    expandedArtworkTop = expandedArtworkTop,
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = expandedArtworkTop)
-                )
-                ExpandedOnlyContent(
-                    progress = animationProgress,
-                    lyricColor = expandedSecondaryColor,
-                    progressTrackColor = progressTrackColor,
-                    progressColor = progressColor,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = expandedLyricTop)
+                        .align(Alignment.TopStart)
                 )
                 SharedSongInfo(
                     title = currentSong.title,
@@ -286,6 +336,15 @@ fun MiniPlayer(
                     expandedTop = expandedMetadataTop,
                     modifier = Modifier
                         .align(Alignment.TopStart)
+                )
+                ExpandedOnlyContent(
+                    progress = animationProgress,
+                    lyricColor = expandedSecondaryColor,
+                    progressTrackColor = progressTrackColor,
+                    progressColor = progressColor,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = expandedLyricTop)
                 )
                 SharedPlaybackControls(
                     progress = animationProgress,
@@ -301,6 +360,188 @@ fun MiniPlayer(
                         .align(Alignment.TopStart)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun FlowCloudBackground(
+    colors: List<Color>,
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    val cloudColors = if (colors.size >= 3) {
+        colors
+    } else {
+        listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.tertiaryContainer
+        )
+    }
+    val infiniteTransition = rememberInfiniteTransition(label = "FlowCloudDrift")
+    val slowDrift by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 12_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "FlowCloudSlowDrift"
+    )
+    val softDrift by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 9_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "FlowCloudSoftDrift"
+    )
+
+    Canvas(modifier = modifier.background(cloudColors[0].copy(alpha = 0.62f))) {
+        val largestSide = size.width.coerceAtLeast(size.height)
+        val expandedBreath = progress * largestSide * 0.04f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(cloudColors[0].copy(alpha = 0.72f), Color.Transparent),
+                center = Offset(
+                    x = size.width * (0.18f + slowDrift * 0.08f),
+                    y = size.height * (0.25f + progress * 0.08f)
+                ),
+                radius = largestSide * 0.62f + expandedBreath
+            ),
+            radius = largestSide * 0.62f + expandedBreath,
+            center = Offset(
+                x = size.width * (0.18f + slowDrift * 0.08f),
+                y = size.height * (0.25f + progress * 0.08f)
+            )
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(cloudColors[1].copy(alpha = 0.58f), Color.Transparent),
+                center = Offset(
+                    x = size.width * (0.82f - softDrift * 0.1f),
+                    y = size.height * (0.18f + slowDrift * 0.1f)
+                ),
+                radius = largestSide * 0.58f
+            ),
+            radius = largestSide * 0.58f,
+            center = Offset(
+                x = size.width * (0.82f - softDrift * 0.1f),
+                y = size.height * (0.18f + slowDrift * 0.1f)
+            )
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(cloudColors[2].copy(alpha = 0.66f), Color.Transparent),
+                center = Offset(
+                    x = size.width * (0.54f + softDrift * 0.06f),
+                    y = size.height * (0.86f - progress * 0.12f)
+                ),
+                radius = largestSide * 0.68f
+            ),
+            radius = largestSide * 0.68f,
+            center = Offset(
+                x = size.width * (0.54f + softDrift * 0.06f),
+                y = size.height * (0.86f - progress * 0.12f)
+            )
+        )
+    }
+}
+
+@Composable
+private fun HiddenBlurArtworkBridge(
+    imageRequest: ImageRequest?,
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    if (imageRequest == null) {
+        return
+    }
+
+    val bridgeAlpha = lerpFloat(0f, 0.32f, progress)
+    val bridgeBlur = lerpDp(40.dp, 0.dp, progress)
+    val blurModifier = if (bridgeBlur > 0.5.dp) {
+        Modifier.blur(bridgeBlur)
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                alpha = bridgeAlpha
+            }
+            .then(blurModifier)
+    ) {
+        AsyncImage(
+            model = imageRequest,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
+private fun MorphArtworkLayer(
+    imageRequest: ImageRequest?,
+    progress: Float,
+    playerWidth: Dp,
+    currentHeight: Dp,
+    collapsedHeight: Dp,
+    expandedArtworkSize: Dp,
+    expandedArtworkTop: Dp,
+    modifier: Modifier = Modifier
+) {
+    val collapsedX = 0.dp
+    val collapsedY = currentHeight - collapsedHeight
+    val collapsedWidth = playerWidth
+    val collapsedHeightForArtwork = collapsedHeight
+    val expandedX = (playerWidth - expandedArtworkSize) / 2f
+    val expandedY = expandedArtworkTop
+    val artworkX = lerpDp(collapsedX, expandedX, progress)
+    val artworkY = lerpDp(collapsedY, expandedY, progress)
+    val artworkWidth = lerpDp(collapsedWidth, expandedArtworkSize, progress)
+    val artworkHeight = lerpDp(collapsedHeightForArtwork, expandedArtworkSize, progress)
+    val blurRadius = lerpDp(16.dp, 0.dp, progress)
+    val cornerRadius = lerpDp(24.dp, 28.dp, progress)
+    val layerAlpha = lerpFloat(0.85f, 1f, progress)
+    val shape = RoundedCornerShape(cornerRadius)
+    val blurModifier = if (blurRadius > 0.5.dp) {
+        Modifier.blur(blurRadius)
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = modifier
+            .offset(x = artworkX, y = artworkY)
+            .width(artworkWidth)
+            .height(artworkHeight)
+            .graphicsLayer {
+                alpha = layerAlpha
+            }
+            .clip(shape)
+            .then(blurModifier)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center
+    ) {
+        if (imageRequest != null) {
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = "\u4e13\u8f91\u5c01\u9762",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(42.dp)
+            )
         }
     }
 }
