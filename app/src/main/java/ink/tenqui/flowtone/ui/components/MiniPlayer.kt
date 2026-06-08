@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,8 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -45,6 +47,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -55,7 +59,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import ink.tenqui.flowtone.playback.PlaybackState
 
-private const val MINI_PLAYER_ANIMATION_DURATION_MS = 390
+private const val MINI_PLAYER_ANIMATION_DURATION_MS = 300
 
 @Composable
 fun MiniPlayer(
@@ -279,7 +283,6 @@ fun MiniPlayer(
                     artistColor = artistColor,
                     playerWidth = playerWidth,
                     collapsedHeight = collapsedHeight,
-                    expandedArtworkSize = expandedArtworkSize,
                     expandedTop = expandedMetadataTop,
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -359,57 +362,109 @@ private fun SharedSongInfo(
     artistColor: Color,
     playerWidth: Dp,
     collapsedHeight: Dp,
-    expandedArtworkSize: Dp,
     expandedTop: Dp,
     modifier: Modifier = Modifier
 ) {
     val metadataGroupHeight = 60.dp
     val collapsedCenterY = collapsedHeight / 2f
-    val collapsedMetadataX = 30.dp
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val titleStyle = MaterialTheme.typography.titleMedium
+    val artistStyle = MaterialTheme.typography.bodyMedium
+    val collapsedViewportX = 30.dp
     val collapsedControlsReservedWidth = 48.dp * 3f + 8.dp * 2f + 30.dp
-    val collapsedMetadataWidth = playerWidth - collapsedMetadataX - collapsedControlsReservedWidth
-    val collapsedMetadataY = collapsedCenterY - metadataGroupHeight / 2f
-    val expandedMetadataWidth = expandedArtworkSize
-    val expandedMetadataX = (playerWidth - expandedArtworkSize) / 2f
-    val expandedMetadataY = expandedTop
-    val metadataX = lerpDp(collapsedMetadataX, expandedMetadataX, progress)
-    val metadataY = lerpDp(collapsedMetadataY, expandedMetadataY, progress)
-    val metadataWidth = lerpDp(collapsedMetadataWidth, expandedMetadataWidth, progress)
-    val metadataScale = lerpFloat(0.95f, 1.2f, progress)
+    val collapsedViewportWidth = playerWidth - collapsedViewportX - collapsedControlsReservedWidth
+    val collapsedViewportY = collapsedCenterY - metadataGroupHeight / 2f
+    val expandedViewportWidth = playerWidth * 0.82f
+    val expandedViewportX = (playerWidth - expandedViewportWidth) / 2f
+    val expandedViewportY = expandedTop
+    val viewportX = lerpDp(collapsedViewportX, expandedViewportX, progress)
+    val viewportY = lerpDp(collapsedViewportY, expandedViewportY, progress)
+    val viewportWidth = lerpDp(collapsedViewportWidth, expandedViewportWidth, progress)
+    val titleWidth = with(density) {
+        textMeasurer.measure(
+            text = AnnotatedString(title),
+            style = titleStyle,
+            maxLines = 1
+        ).size.width.toDp()
+    }
+    val artistWidth = with(density) {
+        textMeasurer.measure(
+            text = AnnotatedString(artist),
+            style = artistStyle,
+            maxLines = 1
+        ).size.width.toDp()
+    }
+    val rawTitleLineWidth = titleWidth + 12.dp
+    val titleLineWidth = when {
+        rawTitleLineWidth < 48.dp -> 48.dp
+        rawTitleLineWidth > expandedViewportWidth -> expandedViewportWidth
+        else -> rawTitleLineWidth
+    }
+    val rawArtistLineWidth = artistWidth + 12.dp
+    val artistLineWidth = when {
+        rawArtistLineWidth < 48.dp -> 48.dp
+        rawArtistLineWidth > expandedViewportWidth -> expandedViewportWidth
+        else -> rawArtistLineWidth
+    }
+    val collapsedTitleX = 0.dp
+    val centeredTitleX = (viewportWidth - titleLineWidth) / 2f
+    val expandedTitleX = if (centeredTitleX < 0.dp) {
+        0.dp
+    } else {
+        centeredTitleX
+    }
+    val collapsedArtistX = 0.dp
+    val centeredArtistX = (viewportWidth - artistLineWidth) / 2f
+    val expandedArtistX = if (centeredArtistX < 0.dp) {
+        0.dp
+    } else {
+        centeredArtistX
+    }
+    val titleX = lerpDp(collapsedTitleX, expandedTitleX, progress)
+    val artistX = lerpDp(collapsedArtistX, expandedArtistX, progress)
 
-    Column(
+    Box(
         modifier = modifier
-            .width(metadataWidth)
+            .width(viewportWidth)
             .height(metadataGroupHeight)
             .graphicsLayer {
-                translationX = metadataX.toPx()
-                translationY = metadataY.toPx()
-                scaleX = metadataScale
-                scaleY = metadataScale
-            },
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.Start
+                translationX = viewportX.toPx()
+                translationY = viewportY.toPx()
+            }
+            .clipToBounds()
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = titleColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Start,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text(
-            text = artist,
-            style = MaterialTheme.typography.bodyMedium,
-            color = artistColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Start,
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp)
-        )
+                .width(viewportWidth)
+                .height(metadataGroupHeight),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = title,
+                style = titleStyle,
+                color = titleColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Start,
+                modifier = Modifier
+                    .width(titleLineWidth)
+                    .offset(x = titleX)
+            )
+            Text(
+                text = artist,
+                style = artistStyle,
+                color = artistColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Start,
+                modifier = Modifier
+                    .width(artistLineWidth)
+                    .offset(x = artistX)
+                    .padding(top = 4.dp)
+            )
+        }
     }
 }
 
