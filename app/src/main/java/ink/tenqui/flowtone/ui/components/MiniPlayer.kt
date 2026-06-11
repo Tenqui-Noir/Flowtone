@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -89,7 +90,11 @@ fun MiniPlayer(
     onPlayNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val currentSong = playbackState.currentSong ?: return
+    val currentSong = playbackState.currentSong
+    val hasCurrentSong = currentSong != null
+    val title = currentSong?.title.orEmpty()
+    val artist = currentSong?.artist.orEmpty()
+    val artworkUri = currentSong?.artworkUri
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val context = LocalContext.current
@@ -115,7 +120,7 @@ fun MiniPlayer(
     }
     val expandedArtworkTop = 24.dp
     val expandedMetadataTop = expandedArtworkTop + expandedArtworkSize + 14.dp
-    val expandedLyricTop = expandedMetadataTop + 72.dp
+    val expandedLyricTop = expandedMetadataTop + 62.dp
     val expandedControlsTop = expandedLyricTop + 62.dp
     val animationProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
@@ -126,29 +131,40 @@ fun MiniPlayer(
         label = "MiniPlayerProgress"
     )
     val currentHeight = collapsedHeight + (expandedHeight - collapsedHeight) * animationProgress
-    val hasArtworkBackground = currentSong.artworkUri != null
-    val backgroundImageRequest: ImageRequest? = remember(currentSong.artworkUri, context) {
-        currentSong.artworkUri?.let { artworkUri ->
+    val visibleProgress by animateFloatAsState(
+        targetValue = if (hasCurrentSong) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = MINI_PLAYER_ANIMATION_DURATION_MS,
+            easing = FastOutSlowInEasing
+        ),
+        label = "MiniPlayerVisibleProgress"
+    )
+    val hiddenOffsetY = with(density) {
+        (currentHeight + dragHotZoneHeight + 32.dp).toPx()
+    }
+    val hasArtworkBackground = artworkUri != null
+    val backgroundImageRequest: ImageRequest? = remember(artworkUri, context) {
+        artworkUri?.let { uri ->
             ImageRequest.Builder(context)
-                .data(artworkUri)
+                .data(uri)
                 .size(256, 256)
                 .crossfade(false)
                 .build()
         }
     }
-    val coverImageRequest: ImageRequest? = remember(currentSong.artworkUri, context) {
-        currentSong.artworkUri?.let { artworkUri ->
+    val coverImageRequest: ImageRequest? = remember(artworkUri, context) {
+        artworkUri?.let { uri ->
             ImageRequest.Builder(context)
-                .data(artworkUri)
+                .data(uri)
                 .size(768, 768)
                 .crossfade(false)
                 .build()
         }
     }
-    val paletteImageRequest: ImageRequest? = remember(currentSong.artworkUri, context) {
-        currentSong.artworkUri?.let { artworkUri ->
+    val paletteImageRequest: ImageRequest? = remember(artworkUri, context) {
+        artworkUri?.let { uri ->
             ImageRequest.Builder(context)
-                .data(artworkUri)
+                .data(uri)
                 .size(128, 128)
                 .allowHardware(false)
                 .crossfade(false)
@@ -231,15 +247,20 @@ fun MiniPlayer(
         MaterialTheme.colorScheme.primary
     }
     var accumulatedDragY by remember { mutableStateOf(0f) }
-    val gestureModifier = Modifier.pointerInput(expanded, swipeThresholdPx) {
+    val gestureModifier = Modifier.pointerInput(hasCurrentSong, expanded, swipeThresholdPx) {
         detectVerticalDragGestures(
             onDragStart = {
                 accumulatedDragY = 0f
             },
             onVerticalDrag = { _, dragAmount ->
-                accumulatedDragY += dragAmount
+                if (hasCurrentSong) {
+                    accumulatedDragY += dragAmount
+                }
             },
             onDragEnd = {
+                if (!hasCurrentSong) {
+                    return@detectVerticalDragGestures
+                }
                 if (!expanded && accumulatedDragY <= -swipeThresholdPx) {
                     onExpandedChange(true)
                 } else if (expanded && accumulatedDragY >= swipeThresholdPx) {
@@ -256,6 +277,10 @@ fun MiniPlayer(
         modifier = modifier
             .fillMaxWidth()
             .height(currentHeight + dragHotZoneHeight)
+            .graphicsLayer {
+                translationY = hiddenOffsetY * (1f - visibleProgress)
+                alpha = visibleProgress
+            }
             .then(gestureModifier)
     ) {
         Box(
@@ -264,13 +289,49 @@ fun MiniPlayer(
                 .height(dragHotZoneHeight)
                 .align(Alignment.TopCenter)
                 .clickable(
-                    enabled = !expanded,
+                    enabled = hasCurrentSong && !expanded,
                     interactionSource = noRippleInteractionSource,
                     indication = null
                 ) {
                     onExpandedChange(true)
                 }
-        )
+        ) {
+            val handleAlpha = lerpFloat(1f, 0.65f, animationProgress)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp)
+                    .width(220.dp)
+                    .height(120.dp)
+                    .graphicsLayer {
+                        alpha = handleAlpha
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(88.dp)
+                        .height(12.dp)
+                        .blur(
+                            radius = 80.dp,
+                            edgeTreatment = BlurredEdgeTreatment.Unbounded
+                        )
+                        .background(
+                            color = Color.White.copy(alpha = 0.42f),
+                            shape = RoundedCornerShape(percent = 50)
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .width(44.dp)
+                        .height(4.dp)
+                        .background(
+                            color = Color.White.copy(alpha = 0.28f),
+                            shape = RoundedCornerShape(percent = 50)
+                        )
+                )
+            }
+        }
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -285,7 +346,7 @@ fun MiniPlayer(
                     }
                 )
                 .clickable(
-                    enabled = !expanded,
+                    enabled = hasCurrentSong && !expanded,
                     interactionSource = noRippleInteractionSource,
                     indication = null
                 ) {
@@ -299,20 +360,24 @@ fun MiniPlayer(
                 contentAlignment = Alignment.BottomCenter
             ) {
                 val playerWidth = maxWidth
-                FlowCloudBackground(
-                    colors = cloudColors,
-                    progress = animationProgress,
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                )
+                BlurredArtworkBackground(
+                    imageRequest = backgroundImageRequest,
                     modifier = Modifier.matchParentSize()
                 )
-                HiddenBlurArtworkBridge(
-                    imageRequest = backgroundImageRequest,
+                FlowCloudBackground(
+                    colors = cloudColors,
                     progress = animationProgress,
                     modifier = Modifier.matchParentSize()
                 )
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(Color.Black.copy(alpha = 0.42f))
+                        .background(Color.Black.copy(alpha = lerpFloat(0.26f, 0.34f, animationProgress)))
                 )
                 MorphArtworkLayer(
                     imageRequest = coverImageRequest,
@@ -326,8 +391,8 @@ fun MiniPlayer(
                         .align(Alignment.TopStart)
                 )
                 SharedSongInfo(
-                    title = currentSong.title,
-                    artist = currentSong.artist,
+                    title = title,
+                    artist = artist,
                     progress = animationProgress,
                     titleColor = titleColor,
                     artistColor = artistColor,
@@ -353,9 +418,21 @@ fun MiniPlayer(
                     screenWidth = playerWidth,
                     collapsedHeight = collapsedHeight,
                     expandedTop = expandedControlsTop,
-                    onPlayPrevious = onPlayPrevious,
-                    onTogglePlayPause = onTogglePlayPause,
-                    onPlayNext = onPlayNext,
+                    onPlayPrevious = {
+                        if (hasCurrentSong) {
+                            onPlayPrevious()
+                        }
+                    },
+                    onTogglePlayPause = {
+                        if (hasCurrentSong) {
+                            onTogglePlayPause()
+                        }
+                    },
+                    onPlayNext = {
+                        if (hasCurrentSong) {
+                            onPlayNext()
+                        }
+                    },
                     modifier = Modifier
                         .align(Alignment.TopStart)
                 )
@@ -380,100 +457,147 @@ private fun FlowCloudBackground(
         )
     }
     val infiniteTransition = rememberInfiniteTransition(label = "FlowCloudDrift")
-    val slowDrift by infiniteTransition.animateFloat(
+    val blob1Drift by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 12_000, easing = LinearEasing),
+            animation = tween(durationMillis = 5_800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "FlowCloudSlowDrift"
+        label = "FlowCloudBlob1Drift"
     )
-    val softDrift by infiniteTransition.animateFloat(
+    val blob2Drift by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9_000, easing = LinearEasing),
+            animation = tween(durationMillis = 7_400, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "FlowCloudSoftDrift"
+        label = "FlowCloudBlob2Drift"
+    )
+    val blob3Drift by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 9_200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "FlowCloudBlob3Drift"
+    )
+    val blob4Drift by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 11_500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "FlowCloudBlob4Drift"
     )
 
-    Canvas(modifier = modifier.background(cloudColors[0].copy(alpha = 0.62f))) {
-        val largestSide = size.width.coerceAtLeast(size.height)
-        val expandedBreath = progress * largestSide * 0.04f
+    Canvas(modifier = modifier) {
+        val alphaMultiplier = 1f + progress * 0.08f
+        val minSide = size.minDimension
+
+        val blob1Radius = minSide * 0.62f
+        val blob2Radius = minSide * 0.54f
+        val blob3Radius = minSide * 0.48f
+        val blob4Radius = minSide * 0.42f
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(cloudColors[0].copy(alpha = 0.72f), Color.Transparent),
-                center = Offset(
-                    x = size.width * (0.18f + slowDrift * 0.08f),
-                    y = size.height * (0.25f + progress * 0.08f)
+                colorStops = arrayOf(
+                    0f to cloudColors[0].copy(alpha = 0.82f * alphaMultiplier),
+                    0.58f to cloudColors[0].copy(alpha = 0.30f * alphaMultiplier),
+                    1f to Color.Transparent
                 ),
-                radius = largestSide * 0.62f + expandedBreath
+                center = Offset(
+                    x = size.width * (-0.28f + blob1Drift * 0.50f),
+                    y = size.height * (-0.06f + blob1Drift * 0.36f)
+                ),
+                radius = blob1Radius
             ),
-            radius = largestSide * 0.62f + expandedBreath,
+            radius = blob1Radius,
             center = Offset(
-                x = size.width * (0.18f + slowDrift * 0.08f),
-                y = size.height * (0.25f + progress * 0.08f)
+                x = size.width * (-0.28f + blob1Drift * 0.50f),
+                y = size.height * (-0.06f + blob1Drift * 0.36f)
             )
         )
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(cloudColors[1].copy(alpha = 0.58f), Color.Transparent),
-                center = Offset(
-                    x = size.width * (0.82f - softDrift * 0.1f),
-                    y = size.height * (0.18f + slowDrift * 0.1f)
+                colorStops = arrayOf(
+                    0f to cloudColors[1].copy(alpha = 0.68f * alphaMultiplier),
+                    0.6f to cloudColors[1].copy(alpha = 0.25f * alphaMultiplier),
+                    1f to Color.Transparent
                 ),
-                radius = largestSide * 0.58f
+                center = Offset(
+                    x = size.width * (1.24f - blob2Drift * 0.46f),
+                    y = size.height * (-0.02f + blob2Drift * 0.28f)
+                ),
+                radius = blob2Radius
             ),
-            radius = largestSide * 0.58f,
+            radius = blob2Radius,
             center = Offset(
-                x = size.width * (0.82f - softDrift * 0.1f),
-                y = size.height * (0.18f + slowDrift * 0.1f)
+                x = size.width * (1.24f - blob2Drift * 0.46f),
+                y = size.height * (-0.02f + blob2Drift * 0.28f)
             )
         )
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(cloudColors[2].copy(alpha = 0.66f), Color.Transparent),
-                center = Offset(
-                    x = size.width * (0.54f + softDrift * 0.06f),
-                    y = size.height * (0.86f - progress * 0.12f)
+                colorStops = arrayOf(
+                    0f to cloudColors[2].copy(alpha = 0.58f * alphaMultiplier),
+                    0.62f to cloudColors[2].copy(alpha = 0.22f * alphaMultiplier),
+                    1f to Color.Transparent
                 ),
-                radius = largestSide * 0.68f
+                center = Offset(
+                    x = size.width * (0.46f - blob3Drift * 0.38f),
+                    y = size.height * (1.20f - blob3Drift * 0.40f)
+                ),
+                radius = blob3Radius
             ),
-            radius = largestSide * 0.68f,
+            radius = blob3Radius,
             center = Offset(
-                x = size.width * (0.54f + softDrift * 0.06f),
-                y = size.height * (0.86f - progress * 0.12f)
+                x = size.width * (0.46f - blob3Drift * 0.38f),
+                y = size.height * (1.20f - blob3Drift * 0.40f)
+            )
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(
+                    0f to cloudColors[1].copy(alpha = 0.50f * alphaMultiplier),
+                    0.64f to cloudColors[1].copy(alpha = 0.18f * alphaMultiplier),
+                    1f to Color.Transparent
+                ),
+                center = Offset(
+                    x = size.width * (1.08f - blob4Drift * 0.28f),
+                    y = size.height * (1.08f - blob4Drift * 0.18f)
+                ),
+                radius = blob4Radius
+            ),
+            radius = blob4Radius,
+            center = Offset(
+                x = size.width * (1.08f - blob4Drift * 0.28f),
+                y = size.height * (1.08f - blob4Drift * 0.18f)
             )
         )
     }
 }
 
 @Composable
-private fun HiddenBlurArtworkBridge(
+private fun BlurredArtworkBackground(
     imageRequest: ImageRequest?,
-    progress: Float,
     modifier: Modifier = Modifier
 ) {
     if (imageRequest == null) {
         return
     }
 
-    val bridgeAlpha = lerpFloat(0f, 0.32f, progress)
-    val bridgeBlur = lerpDp(40.dp, 0.dp, progress)
-    val blurModifier = if (bridgeBlur > 0.5.dp) {
-        Modifier.blur(bridgeBlur)
-    } else {
-        Modifier
-    }
-
     Box(
         modifier = modifier
             .graphicsLayer {
-                alpha = bridgeAlpha
+                alpha = 0.78f
+                scaleX = 1.22f
+                scaleY = 1.22f
             }
-            .then(blurModifier)
+            .blur(100.dp)
     ) {
         AsyncImage(
             model = imageRequest,
@@ -578,18 +702,18 @@ private fun ExpandedOnlyContent(
                     translationY = offsetPx(40.dp)
                 }
         )
+        Box(modifier = Modifier.height(10.dp))
         FakeProgressBar(
             progress = 0.35f,
             trackColor = progressTrackColor,
             progressColor = progressColor,
             modifier = Modifier
-                .padding(top = 18.dp)
                 .fillMaxWidth(0.76f)
                 .graphicsLayer {
                     alpha = helperAlpha
-                scaleX = 0.92f + (1f - 0.92f) * progress
-                translationY = offsetPx(36.dp)
-            }
+                    scaleX = 0.92f + (1f - 0.92f) * progress
+                    translationY = offsetPx(36.dp)
+                }
         )
     }
 }
@@ -805,20 +929,30 @@ private fun FakeProgressBar(
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(50)
+    val progressContainerHeight = 24.dp
+    val progressTrackHeight = 6.dp
 
     Box(
         modifier = modifier
-            .height(4.dp)
-            .clip(shape)
-            .background(trackColor)
+            .height(progressContainerHeight),
+        contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .height(4.dp)
+                .fillMaxWidth()
+                .height(progressTrackHeight)
                 .clip(shape)
-                .background(progressColor)
-        )
+                .background(trackColor),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .height(progressTrackHeight)
+                    .clip(shape)
+                    .background(progressColor)
+            )
+        }
     }
 }
 

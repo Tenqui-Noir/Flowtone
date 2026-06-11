@@ -1,5 +1,6 @@
 package ink.tenqui.flowtone.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -54,8 +55,9 @@ fun FlowtoneApp(
     var miniPlayerExpanded by rememberSaveable {
         mutableStateOf(false)
     }
+    val hasCurrentSong = playbackState.currentSong != null
     val backgroundBlurProgress by animateFloatAsState(
-        targetValue = if (miniPlayerExpanded) 1f else 0f,
+        targetValue = if (hasCurrentSong && miniPlayerExpanded) 1f else 0f,
         animationSpec = tween(
             durationMillis = 300,
             easing = FastOutSlowInEasing
@@ -63,7 +65,7 @@ fun FlowtoneApp(
         label = "MiniPlayerBackgroundBlurProgress"
     )
     val backgroundBlurRadius by animateDpAsState(
-        targetValue = if (miniPlayerExpanded) 12.dp else 0.dp,
+        targetValue = if (hasCurrentSong && miniPlayerExpanded) 12.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 300,
             easing = FastOutSlowInEasing
@@ -78,6 +80,16 @@ fun FlowtoneApp(
         permissionDenied = !granted
         if (granted) {
             musicViewModel.scanSongs()
+        }
+    }
+
+    BackHandler(enabled = hasCurrentSong && miniPlayerExpanded) {
+        miniPlayerExpanded = false
+    }
+
+    LaunchedEffect(playbackState.currentSong) {
+        if (playbackState.currentSong == null) {
+            miniPlayerExpanded = false
         }
     }
 
@@ -124,7 +136,7 @@ fun FlowtoneApp(
                     .padding(innerPadding)
             )
         }
-        if (backgroundBlurProgress > 0.01f) {
+        if (hasCurrentSong && backgroundBlurProgress > 0.01f) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
