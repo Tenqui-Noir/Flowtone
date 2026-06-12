@@ -55,10 +55,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -165,9 +170,22 @@ fun MiniPlayer(
         ),
         label = "MiniPlayerVisibleProgress"
     )
-    val hiddenOffsetY = with(density) {
-        (currentHeight + dragHotZoneHeight + 32.dp).toPx()
-    }
+    val hiddenOffsetDp = currentHeight + dragHotZoneHeight + 32.dp
+
+    val slideInEasing = CubicBezierEasing(0.05f, 0.85f, 0.18f, 1.0f)
+
+    val miniPlayerSlideOffsetY by animateDpAsState(
+        targetValue = if (hasCurrentSong) 0.dp else hiddenOffsetDp,
+        animationSpec = tween(
+            durationMillis = 360,
+            easing = if (hasCurrentSong) {
+                slideInEasing
+            } else {
+                FastOutSlowInEasing
+            }
+        ),
+        label = "MiniPlayerSlideOffsetY"
+    )
     val hasArtworkBackground = artworkUri != null
     val backgroundImageRequest: ImageRequest? = remember(artworkUri, context) {
         artworkUri?.let { uri ->
@@ -317,7 +335,7 @@ fun MiniPlayer(
             .fillMaxWidth()
             .height(currentHeight + dragHotZoneHeight)
             .graphicsLayer {
-                translationY = hiddenOffsetY * (1f - visibleProgress)
+                translationY = miniPlayerSlideOffsetY.toPx()
                 alpha = visibleProgress
             }
             .then(gestureModifier)
@@ -354,7 +372,7 @@ fun MiniPlayer(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 8.dp)
-                    .offset(y = 6.dp)
+                    .offset(y = 0.dp)
                     .width(72.dp)
                     .height(6.dp)
                     .graphicsLayer {
@@ -376,21 +394,14 @@ fun MiniPlayer(
         }
         Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
+                .align(Alignment.TopCenter)
+                .offset(y = dragHotZoneHeight)
                 .fillMaxWidth()
                 .height(currentHeight)
                 .shadow(
                     elevation = playerShadowElevation,
                     shape = playerShape,
                     clip = false
-                )
-                .clip(playerShape)
-                .then(
-                    if (hasArtworkBackground) {
-                        Modifier
-                    } else {
-                        Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    }
                 )
                 .clickable(
                     enabled = hasCurrentSong && !expanded,
@@ -400,13 +411,20 @@ fun MiniPlayer(
                     onExpandedChange(true)
                 }
         ) {
-            BoxWithConstraints(
+            Box(
                 modifier = Modifier
+                    .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(currentHeight),
-                contentAlignment = Alignment.BottomCenter
+                    .height(currentHeight)
+                    .clip(playerShape)
+                    .then(
+                        if (hasArtworkBackground) {
+                            Modifier
+                        } else {
+                            Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        }
+                    )
             ) {
-                val playerWidth = maxWidth
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -427,75 +445,90 @@ fun MiniPlayer(
                         .matchParentSize()
                         .background(Color.Black.copy(alpha = lerpFloat(0.28f, 0.42f, animationProgress)))
                 )
-                MorphArtworkLayer(
-                    imageRequest = coverImageRequest,
-                    progress = animationProgress,
-                    playerWidth = playerWidth,
-                    currentHeight = currentHeight,
-                    collapsedHeight = collapsedHeight,
-                    expandedArtworkSize = expandedArtworkSize,
-                    expandedArtworkTop = expandedArtworkTop,
+            }
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(currentHeight)
+                    .align(Alignment.TopCenter),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                val playerWidth = maxWidth
+                Box(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                )
-                SharedSongInfo(
-                    title = title,
-                    artist = artist,
-                    progress = animationProgress,
-                    titleColor = titleColor,
-                    artistColor = artistColor,
-                    playerWidth = playerWidth,
-                    collapsedHeight = collapsedHeight,
-                    expandedTop = expandedMetadataTop,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                )
-                ExpandedOnlyContent(
-                    progress = animationProgress,
-                    playbackProgress = playbackProgress,
-                    durationMs = durationMs,
-                    hasCurrentSong = hasCurrentSong,
-                    progressTrackColor = progressTrackColor,
-                    progressColor = progressColor,
-                    onSeekTo = onSeekTo,
-                    onScrubbingChange = { scrubbing ->
-                        if (scrubbing) {
-                            lockedIsPlayingDuringScrub = playbackState.isPlaying
-                            keepPlayPauseVisualLockedAfterSeek = true
-                        }
-                        isProgressScrubbing = scrubbing
-                    },
-                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(currentHeight)
                         .align(Alignment.TopCenter)
-                        .padding(top = expandedProgressTop)
-                )
-                SharedPlaybackControls(
-                    progress = animationProgress,
-                    isPlaying = visualIsPlaying,
-                    iconColor = controlIconColor,
-                    screenWidth = playerWidth,
-                    collapsedHeight = collapsedHeight,
-                    expandedTop = expandedControlsTop,
-                    onPlayPrevious = {
-                        if (hasCurrentSong) {
-                            onPlayPrevious()
-                        }
-                    },
-                    onTogglePlayPause = {
-                        if (hasCurrentSong) {
-                            isProgressScrubbing = false
-                            keepPlayPauseVisualLockedAfterSeek = false
-                            onTogglePlayPause()
-                        }
-                    },
-                    onPlayNext = {
-                        if (hasCurrentSong) {
-                            onPlayNext()
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                )
+                ) {
+                    MorphArtworkLayer(
+                        imageRequest = coverImageRequest,
+                        progress = animationProgress,
+                        playerWidth = playerWidth,
+                        collapsedHeight = collapsedHeight,
+                        expandedArtworkSize = expandedArtworkSize,
+                        expandedArtworkTop = expandedArtworkTop,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                    )
+                    SharedSongInfo(
+                        title = title,
+                        artist = artist,
+                        progress = animationProgress,
+                        titleColor = titleColor,
+                        artistColor = artistColor,
+                        playerWidth = playerWidth,
+                        collapsedHeight = collapsedHeight,
+                        expandedTop = expandedMetadataTop,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                    )
+                    ExpandedOnlyContent(
+                        progress = animationProgress,
+                        playbackProgress = playbackProgress,
+                        durationMs = durationMs,
+                        hasCurrentSong = hasCurrentSong,
+                        progressTrackColor = progressTrackColor,
+                        progressColor = progressColor,
+                        onSeekTo = onSeekTo,
+                        onScrubbingChange = { scrubbing ->
+                            if (scrubbing) {
+                                lockedIsPlayingDuringScrub = playbackState.isPlaying
+                                keepPlayPauseVisualLockedAfterSeek = true
+                            }
+                            isProgressScrubbing = scrubbing
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = expandedProgressTop)
+                    )
+                    SharedPlaybackControls(
+                        progress = animationProgress,
+                        isPlaying = visualIsPlaying,
+                        iconColor = controlIconColor,
+                        screenWidth = playerWidth,
+                        collapsedHeight = collapsedHeight,
+                        expandedTop = expandedControlsTop,
+                        onPlayPrevious = {
+                            if (hasCurrentSong) {
+                                onPlayPrevious()
+                            }
+                        },
+                        onTogglePlayPause = {
+                            if (hasCurrentSong) {
+                                isProgressScrubbing = false
+                                keepPlayPauseVisualLockedAfterSeek = false
+                                onTogglePlayPause()
+                            }
+                        },
+                        onPlayNext = {
+                            if (hasCurrentSong) {
+                                onPlayNext()
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                    )
+                }
             }
         }
     }
@@ -674,22 +707,20 @@ private fun MorphArtworkLayer(
     imageRequest: ImageRequest?,
     progress: Float,
     playerWidth: Dp,
-    currentHeight: Dp,
     collapsedHeight: Dp,
     expandedArtworkSize: Dp,
     expandedArtworkTop: Dp,
     modifier: Modifier = Modifier
 ) {
     val collapsedX = 0.dp
-    val collapsedY = currentHeight - collapsedHeight
+    val collapsedY = 0.dp
     val collapsedWidth = playerWidth
-    val collapsedHeightForArtwork = collapsedHeight
     val expandedX = (playerWidth - expandedArtworkSize) / 2f
     val expandedY = expandedArtworkTop
     val artworkX = lerpDp(collapsedX, expandedX, progress)
     val artworkY = lerpDp(collapsedY, expandedY, progress)
     val artworkWidth = lerpDp(collapsedWidth, expandedArtworkSize, progress)
-    val artworkHeight = lerpDp(collapsedHeightForArtwork, expandedArtworkSize, progress)
+    val artworkHeight = lerpDp(collapsedHeight, expandedArtworkSize, progress)
     val blurRadius = lerpDp(16.dp, 0.dp, progress)
     val cornerRadius = lerpDp(24.dp, 28.dp, progress)
     val shadowPadding = 32.dp
@@ -1114,12 +1145,12 @@ private fun PlaybackProgressBar(
                 }
         ) {
             val centerY = size.height / 2f
-            val strokeWidth = animatedTrackHeight.toPx()
-            val inset = strokeWidth / 2f
-            val startX = inset
-            val endX = (size.width - inset).coerceAtLeast(startX)
-            val progressEndX = (startX + (endX - startX) * visibleProgress)
-                .coerceIn(startX, endX)
+            val trackHeight = animatedTrackHeight.toPx()
+            val trackTop = centerY - trackHeight / 2f
+            val trackLeft = 0f
+            val trackWidth = size.width
+            val cornerRadius = trackHeight / 2f
+            val progressWidth = trackWidth * visibleProgress.coerceIn(0f, 1f)
             val shadowOffsetY = 3.dp.toPx()
             val shadowBlurRadius = 8.dp.toPx()
             val shadowAlpha = enterProgress * 0.14f
@@ -1127,36 +1158,48 @@ private fun PlaybackProgressBar(
                 val paint = NativePaint().apply {
                     isAntiAlias = true
                     color = Color.Black.copy(alpha = shadowAlpha).toArgb()
-                    this.strokeWidth = strokeWidth
-                    strokeCap = NativePaint.Cap.ROUND
                     maskFilter = BlurMaskFilter(
                         shadowBlurRadius,
                         BlurMaskFilter.Blur.NORMAL
                     )
                 }
-                canvas.nativeCanvas.drawLine(
-                    startX,
-                    centerY + shadowOffsetY,
-                    endX,
-                    centerY + shadowOffsetY,
+                canvas.nativeCanvas.drawRoundRect(
+                    RectF(
+                        trackLeft,
+                        trackTop + shadowOffsetY,
+                        trackLeft + trackWidth,
+                        trackTop + trackHeight + shadowOffsetY
+                    ),
+                    cornerRadius,
+                    cornerRadius,
                     paint
                 )
             }
-            drawLine(
+            drawRoundRect(
                 color = trackColor,
-                start = Offset(startX, centerY),
-                end = Offset(endX, centerY),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
+                topLeft = Offset(trackLeft, trackTop),
+                size = Size(trackWidth, trackHeight),
+                cornerRadius = CornerRadius(cornerRadius, cornerRadius)
             )
             if (visibleProgress > 0f) {
-                drawLine(
-                    color = activeProgressColor,
-                    start = Offset(startX, centerY),
-                    end = Offset(progressEndX, centerY),
-                    strokeWidth = strokeWidth,
-                    cap = StrokeCap.Round
-                )
+                val trackPath = Path().apply {
+                    addRoundRect(
+                        RoundRect(
+                            left = trackLeft,
+                            top = trackTop,
+                            right = trackLeft + trackWidth,
+                            bottom = trackTop + trackHeight,
+                            cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+                        )
+                    )
+                }
+                clipPath(trackPath) {
+                    drawRect(
+                        color = activeProgressColor,
+                        topLeft = Offset(trackLeft, trackTop),
+                        size = Size(progressWidth, trackHeight)
+                    )
+                }
             }
         }
     }
