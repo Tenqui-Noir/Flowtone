@@ -12,6 +12,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+data class PlaybackSnapshot(
+    val currentMediaItem: MediaItem?,
+    val currentMediaItemIndex: Int,
+    val mediaItemCount: Int,
+    val queueMediaItems: List<MediaItem>,
+    val isPlaying: Boolean,
+    val positionMs: Long,
+    val durationMs: Long
+)
+
 class PlaybackController(
     context: Context,
     private val onPlaybackEnded: () -> Unit,
@@ -25,6 +35,7 @@ class PlaybackController(
     private var isReleased = false
 
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+    val isConnected: StateFlow<Boolean> = mediaControllerConnection.isConnected
 
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -106,6 +117,8 @@ class PlaybackController(
                 it.copy(
                     currentSong = song,
                     isPlaying = false,
+                    positionMs = 0L,
+                    durationMs = song.durationMs.coerceAtLeast(0L),
                     errorMessage = null
                 )
             }
@@ -121,6 +134,8 @@ class PlaybackController(
                 it.copy(
                     currentSong = song,
                     isPlaying = true,
+                    positionMs = 0L,
+                    durationMs = song.durationMs.coerceAtLeast(0L),
                     errorMessage = null
                 )
             }
@@ -129,6 +144,7 @@ class PlaybackController(
                 it.copy(
                     currentSong = song,
                     isPlaying = false,
+                    durationMs = song.durationMs.coerceAtLeast(0L),
                     errorMessage = error.message ?: "\u64ad\u653e\u5931\u8d25"
                 )
             }
@@ -158,6 +174,8 @@ class PlaybackController(
                 it.copy(
                     currentSong = startSong,
                     isPlaying = true,
+                    positionMs = 0L,
+                    durationMs = startSong.durationMs.coerceAtLeast(0L),
                     errorMessage = null
                 )
             }
@@ -166,6 +184,7 @@ class PlaybackController(
                 it.copy(
                     currentSong = startSong,
                     isPlaying = false,
+                    durationMs = startSong.durationMs.coerceAtLeast(0L),
                     errorMessage = error.message ?: "\u64ad\u653e\u5931\u8d25"
                 )
             }
@@ -174,8 +193,70 @@ class PlaybackController(
 
     fun updateCurrentSong(song: Song) {
         _playbackState.update {
-            it.copy(currentSong = song)
+            it.copy(
+                currentSong = song,
+                positionMs = 0L,
+                durationMs = song.durationMs.coerceAtLeast(0L)
+            )
         }
+    }
+
+    fun updateProgress(positionMs: Long, durationMs: Long) {
+        _playbackState.update {
+            it.copy(
+                positionMs = positionMs.coerceAtLeast(0L),
+                durationMs = durationMs.coerceAtLeast(0L)
+            )
+        }
+    }
+
+    fun updateFromSnapshot(
+        currentSong: Song,
+        isPlaying: Boolean,
+        positionMs: Long,
+        durationMs: Long
+    ) {
+        _playbackState.update {
+            it.copy(
+                currentSong = currentSong,
+                isPlaying = isPlaying,
+                positionMs = positionMs.coerceAtLeast(0L),
+                durationMs = durationMs.coerceAtLeast(0L),
+                errorMessage = null
+            )
+        }
+    }
+
+    fun getCurrentPositionMs(): Long {
+        val position = mediaControllerConnection.currentController?.currentPosition ?: 0L
+        return position.coerceAtLeast(0L)
+    }
+
+    fun getDurationMs(): Long {
+        val duration = mediaControllerConnection.currentController?.duration ?: 0L
+        return safeDuration(duration)
+    }
+
+    fun seekTo(positionMs: Long) {
+        mediaControllerConnection.currentController?.seekTo(positionMs.coerceAtLeast(0L))
+    }
+
+    fun getPlaybackSnapshot(): PlaybackSnapshot? {
+        val controller = mediaControllerConnection.currentController ?: return null
+        val mediaItemCount = controller.mediaItemCount
+        val queueMediaItems = (0 until mediaItemCount).mapNotNull { index ->
+            runCatching { controller.getMediaItemAt(index) }.getOrNull()
+        }
+
+        return PlaybackSnapshot(
+            currentMediaItem = controller.currentMediaItem,
+            currentMediaItemIndex = controller.currentMediaItemIndex,
+            mediaItemCount = mediaItemCount,
+            queueMediaItems = queueMediaItems,
+            isPlaying = controller.isPlaying,
+            positionMs = controller.currentPosition.coerceAtLeast(0L),
+            durationMs = safeDuration(controller.duration)
+        )
     }
 
     fun play() {
@@ -218,5 +299,13 @@ class PlaybackController(
         pendingQueueStartIndex = null
         mediaControllerConnection.currentController?.removeListener(listener)
         mediaControllerConnection.release()
+    }
+
+    private fun safeDuration(durationMs: Long): Long {
+        return if (durationMs == C.TIME_UNSET || durationMs < 0L) {
+            0L
+        } else {
+            durationMs
+        }
     }
 }

@@ -1,9 +1,13 @@
 package ink.tenqui.flowtone.ui.components
 
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint as NativePaint
+import android.graphics.RectF
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -12,6 +16,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -44,15 +50,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -62,6 +75,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
 import coil3.compose.AsyncImage
@@ -73,6 +87,7 @@ import coil3.request.crossfade
 import coil3.toBitmap
 import ink.tenqui.flowtone.playback.PlaybackState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 private const val MINI_PLAYER_ANIMATION_DURATION_MS = 300
@@ -88,6 +103,7 @@ fun MiniPlayer(
     onTogglePlayPause: () -> Unit,
     onPlayPrevious: () -> Unit,
     onPlayNext: () -> Unit,
+    onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentSong = playbackState.currentSong
@@ -95,6 +111,16 @@ fun MiniPlayer(
     val title = currentSong?.title.orEmpty()
     val artist = currentSong?.artist.orEmpty()
     val artworkUri = currentSong?.artworkUri
+    val durationMs = when {
+        playbackState.durationMs > 0L -> playbackState.durationMs
+        currentSong?.durationMs != null && currentSong.durationMs > 0L -> currentSong.durationMs
+        else -> 0L
+    }
+    val playbackProgress = if (durationMs > 0L) {
+        playbackState.positionMs.toFloat() / durationMs.toFloat()
+    } else {
+        0f
+    }.coerceIn(0f, 1f)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val context = LocalContext.current
@@ -120,8 +146,8 @@ fun MiniPlayer(
     }
     val expandedArtworkTop = 24.dp
     val expandedMetadataTop = expandedArtworkTop + expandedArtworkSize + 14.dp
-    val expandedLyricTop = expandedMetadataTop + 62.dp
-    val expandedControlsTop = expandedLyricTop + 62.dp
+    val expandedProgressTop = expandedMetadataTop + 76.dp
+    val expandedControlsTop = expandedProgressTop + 58.dp
     val animationProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = tween(
@@ -231,20 +257,33 @@ fun MiniPlayer(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val expandedSecondaryColor = if (hasArtworkBackground) {
-        Color.White.copy(alpha = 0.82f)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
     val progressTrackColor = if (hasArtworkBackground) {
-        Color.White.copy(alpha = 0.24f)
+        Color(0xFF9E9E9E)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        Color(0xFF8A8A8A)
     }
     val progressColor = if (hasArtworkBackground) {
-        Color.White.copy(alpha = 0.86f)
+        Color.White
     } else {
         MaterialTheme.colorScheme.primary
+    }
+    var isProgressScrubbing by remember { mutableStateOf(false) }
+    var lockedIsPlayingDuringScrub by remember { mutableStateOf(playbackState.isPlaying) }
+    var keepPlayPauseVisualLockedAfterSeek by remember { mutableStateOf(false) }
+    LaunchedEffect(currentSong?.id) {
+        isProgressScrubbing = false
+        keepPlayPauseVisualLockedAfterSeek = false
+    }
+    LaunchedEffect(isProgressScrubbing, keepPlayPauseVisualLockedAfterSeek) {
+        if (keepPlayPauseVisualLockedAfterSeek && !isProgressScrubbing) {
+            delay(500)
+            keepPlayPauseVisualLockedAfterSeek = false
+        }
+    }
+    val visualIsPlaying = if (isProgressScrubbing || keepPlayPauseVisualLockedAfterSeek) {
+        lockedIsPlayingDuringScrub
+    } else {
+        playbackState.isPlaying
     }
     var accumulatedDragY by remember { mutableStateOf(0f) }
     val gestureModifier = Modifier.pointerInput(hasCurrentSong, expanded, swipeThresholdPx) {
@@ -283,6 +322,8 @@ fun MiniPlayer(
             }
             .then(gestureModifier)
     ) {
+        val playerShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        val playerShadowElevation = lerpDp(0.dp, 18.dp, animationProgress)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -297,38 +338,39 @@ fun MiniPlayer(
                 }
         ) {
             val handleAlpha = lerpFloat(1f, 0.65f, animationProgress)
+            val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+            val handleShape = RoundedCornerShape(percent = 50)
+            val handleBaseColor = if (isLightTheme) {
+                Color.Black.copy(alpha = 0.22f)
+            } else {
+                Color.White.copy(alpha = 0.26f)
+            }
+            val handleBlurColor = if (isLightTheme) {
+                Color.Black.copy(alpha = 0.18f)
+            } else {
+                Color.White.copy(alpha = 0.20f)
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 8.dp)
-                    .width(220.dp)
-                    .height(120.dp)
+                    .offset(y = 6.dp)
+                    .width(72.dp)
+                    .height(6.dp)
                     .graphicsLayer {
                         alpha = handleAlpha
-                    },
-                contentAlignment = Alignment.Center
+                    }
+                    .clip(handleShape)
+                    .background(handleBaseColor, handleShape)
             ) {
                 Box(
                     modifier = Modifier
-                        .width(88.dp)
-                        .height(12.dp)
-                        .blur(
-                            radius = 80.dp,
-                            edgeTreatment = BlurredEdgeTreatment.Unbounded
-                        )
+                        .matchParentSize()
                         .background(
-                            color = Color.White.copy(alpha = 0.42f),
-                            shape = RoundedCornerShape(percent = 50)
+                            color = handleBlurColor,
+                            shape = handleShape
                         )
-                )
-                Box(
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(4.dp)
-                        .background(
-                            color = Color.White.copy(alpha = 0.28f),
-                            shape = RoundedCornerShape(percent = 50)
-                        )
+                        .blur(8.dp)
                 )
             }
         }
@@ -337,7 +379,12 @@ fun MiniPlayer(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .height(currentHeight)
-                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                .shadow(
+                    elevation = playerShadowElevation,
+                    shape = playerShape,
+                    clip = false
+                )
+                .clip(playerShape)
                 .then(
                     if (hasArtworkBackground) {
                         Modifier
@@ -367,6 +414,7 @@ fun MiniPlayer(
                 )
                 BlurredArtworkBackground(
                     imageRequest = backgroundImageRequest,
+                    alpha = lerpFloat(0.78f, 0f, animationProgress),
                     modifier = Modifier.matchParentSize()
                 )
                 FlowCloudBackground(
@@ -377,7 +425,7 @@ fun MiniPlayer(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(Color.Black.copy(alpha = lerpFloat(0.26f, 0.34f, animationProgress)))
+                        .background(Color.Black.copy(alpha = lerpFloat(0.28f, 0.42f, animationProgress)))
                 )
                 MorphArtworkLayer(
                     imageRequest = coverImageRequest,
@@ -404,16 +452,26 @@ fun MiniPlayer(
                 )
                 ExpandedOnlyContent(
                     progress = animationProgress,
-                    lyricColor = expandedSecondaryColor,
+                    playbackProgress = playbackProgress,
+                    durationMs = durationMs,
+                    hasCurrentSong = hasCurrentSong,
                     progressTrackColor = progressTrackColor,
                     progressColor = progressColor,
+                    onSeekTo = onSeekTo,
+                    onScrubbingChange = { scrubbing ->
+                        if (scrubbing) {
+                            lockedIsPlayingDuringScrub = playbackState.isPlaying
+                            keepPlayPauseVisualLockedAfterSeek = true
+                        }
+                        isProgressScrubbing = scrubbing
+                    },
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = expandedLyricTop)
+                        .padding(top = expandedProgressTop)
                 )
                 SharedPlaybackControls(
                     progress = animationProgress,
-                    isPlaying = playbackState.isPlaying,
+                    isPlaying = visualIsPlaying,
                     iconColor = controlIconColor,
                     screenWidth = playerWidth,
                     collapsedHeight = collapsedHeight,
@@ -425,6 +483,8 @@ fun MiniPlayer(
                     },
                     onTogglePlayPause = {
                         if (hasCurrentSong) {
+                            isProgressScrubbing = false
+                            keepPlayPauseVisualLockedAfterSeek = false
                             onTogglePlayPause()
                         }
                     },
@@ -461,7 +521,7 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 5_800, easing = LinearEasing),
+            animation = tween(durationMillis = 4_800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob1Drift"
@@ -470,7 +530,7 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 7_400, easing = LinearEasing),
+            animation = tween(durationMillis = 6_400, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob2Drift"
@@ -479,7 +539,7 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9_200, easing = LinearEasing),
+            animation = tween(durationMillis = 7_200, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob3Drift"
@@ -488,7 +548,7 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 11_500, easing = LinearEasing),
+            animation = tween(durationMillis = 9_500, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob4Drift"
@@ -584,16 +644,17 @@ private fun FlowCloudBackground(
 @Composable
 private fun BlurredArtworkBackground(
     imageRequest: ImageRequest?,
+    alpha: Float,
     modifier: Modifier = Modifier
 ) {
-    if (imageRequest == null) {
+    if (imageRequest == null || alpha <= 0.01f) {
         return
     }
 
     Box(
         modifier = modifier
             .graphicsLayer {
-                alpha = 0.78f
+                this.alpha = alpha
                 scaleX = 1.22f
                 scaleY = 1.22f
             }
@@ -631,8 +692,10 @@ private fun MorphArtworkLayer(
     val artworkHeight = lerpDp(collapsedHeightForArtwork, expandedArtworkSize, progress)
     val blurRadius = lerpDp(16.dp, 0.dp, progress)
     val cornerRadius = lerpDp(24.dp, 28.dp, progress)
-    val layerAlpha = lerpFloat(0.85f, 1f, progress)
-    val shape = RoundedCornerShape(cornerRadius)
+    val shadowPadding = 32.dp
+    val shadowProgress = progress.coerceIn(0f, 1f)
+    val imageScale = lerpFloat(1.22f, 1f, progress)
+    val coverShape = RoundedCornerShape(cornerRadius)
     val blurModifier = if (blurRadius > 0.5.dp) {
         Modifier.blur(blurRadius)
     } else {
@@ -641,31 +704,80 @@ private fun MorphArtworkLayer(
 
     Box(
         modifier = modifier
-            .offset(x = artworkX, y = artworkY)
-            .width(artworkWidth)
-            .height(artworkHeight)
+            .offset(x = artworkX - shadowPadding, y = artworkY - shadowPadding)
+            .width(artworkWidth + shadowPadding * 2)
+            .height(artworkHeight + shadowPadding * 2)
             .graphicsLayer {
-                alpha = layerAlpha
+                alpha = 1f
             }
-            .clip(shape)
-            .then(blurModifier)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        contentAlignment = Alignment.Center
     ) {
-        if (imageRequest != null) {
-            AsyncImage(
-                model = imageRequest,
-                contentDescription = "\u4e13\u8f91\u5c01\u9762",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(42.dp)
-            )
+        Canvas(modifier = Modifier.matchParentSize()) {
+            if (shadowProgress > 0f) {
+                val shadowPaddingPx = shadowPadding.toPx()
+                val shadowAlpha = 0.20f * shadowProgress
+                val shadowBlur = 22.dp.toPx() * shadowProgress
+                val shadowOffsetY = 10.dp.toPx() * shadowProgress
+                drawIntoCanvas { canvas ->
+                    val paint = NativePaint().apply {
+                        isAntiAlias = true
+                        color = Color.Black.copy(alpha = shadowAlpha).toArgb()
+                        maskFilter = BlurMaskFilter(
+                            shadowBlur.coerceAtLeast(0.1f),
+                            BlurMaskFilter.Blur.NORMAL
+                        )
+                    }
+                    val rect = RectF(
+                        shadowPaddingPx,
+                        shadowPaddingPx + shadowOffsetY,
+                        shadowPaddingPx + artworkWidth.toPx(),
+                        shadowPaddingPx + artworkHeight.toPx() + shadowOffsetY
+                    )
+                    canvas.nativeCanvas.drawRoundRect(
+                        rect,
+                        cornerRadius.toPx(),
+                        cornerRadius.toPx(),
+                        paint
+                    )
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .offset(x = shadowPadding, y = shadowPadding)
+                .width(artworkWidth)
+                .height(artworkHeight)
+                .graphicsLayer {
+                    shape = coverShape
+                    clip = true
+                }
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = coverShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (imageRequest != null) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = "\u4e13\u8f91\u5c01\u9762",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            scaleX = imageScale
+                            scaleY = imageScale
+                            transformOrigin = TransformOrigin.Center
+                        }
+                        .then(blurModifier)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(42.dp)
+                )
+            }
         }
     }
 }
@@ -673,47 +785,33 @@ private fun MorphArtworkLayer(
 @Composable
 private fun ExpandedOnlyContent(
     progress: Float,
-    lyricColor: Color,
+    playbackProgress: Float,
+    durationMs: Long,
+    hasCurrentSong: Boolean,
     progressTrackColor: Color,
     progressColor: Color,
+    onSeekTo: (Long) -> Unit,
+    onScrubbingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
-    fun offsetPx(dp: androidx.compose.ui.unit.Dp): Float = with(density) {
-        (dp * (1f - progress)).toPx()
-    }
-    val helperAlpha = 0.85f + 0.15f * progress
+    val progressEnterProgress = ((progress - 0.18f) / 0.82f).coerceIn(0f, 1f)
 
     Column(
         modifier = modifier
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "\u266a \u6682\u65e0\u6b4c\u8bcd",
-            style = MaterialTheme.typography.bodyMedium,
-            color = lyricColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .padding(top = 14.dp)
-                .graphicsLayer {
-                    alpha = helperAlpha
-                    translationY = offsetPx(40.dp)
-                }
-        )
-        Box(modifier = Modifier.height(10.dp))
-        FakeProgressBar(
-            progress = 0.35f,
+        PlaybackProgressBar(
+            playbackProgress = playbackProgress,
+            durationMs = durationMs,
+            enabled = hasCurrentSong && durationMs > 0L,
             trackColor = progressTrackColor,
             progressColor = progressColor,
+            onSeekTo = onSeekTo,
+            onScrubbingChange = onScrubbingChange,
+            enterProgress = progressEnterProgress,
             modifier = Modifier
                 .fillMaxWidth(0.76f)
-                .graphicsLayer {
-                    alpha = helperAlpha
-                    scaleX = 0.92f + (1f - 0.92f) * progress
-                    translationY = offsetPx(36.dp)
-                }
         )
     }
 }
@@ -922,36 +1020,144 @@ private fun SharedPlaybackControls(
 }
 
 @Composable
-private fun FakeProgressBar(
-    progress: Float,
+private fun PlaybackProgressBar(
+    playbackProgress: Float,
+    durationMs: Long,
+    enabled: Boolean,
     trackColor: Color,
     progressColor: Color,
+    onSeekTo: (Long) -> Unit,
+    onScrubbingChange: (Boolean) -> Unit,
+    enterProgress: Float,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(50)
-    val progressContainerHeight = 24.dp
-    val progressTrackHeight = 6.dp
+    var isScrubbing by remember { mutableStateOf(false) }
+    var scrubProgress by remember { mutableStateOf(0f) }
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    val animatedTrackHeight by animateDpAsState(
+        targetValue = if (isScrubbing) 16.dp else 8.dp,
+        animationSpec = tween(
+            durationMillis = 160,
+            easing = FastOutSlowInEasing
+        ),
+        label = "ProgressTrackHeight"
+    )
+    val visibleProgress = if (isScrubbing) {
+        scrubProgress
+    } else {
+        playbackProgress
+    }.coerceIn(0f, 1f)
+    val activeProgressColor = progressColor
+
+    fun updateScrubProgress(x: Float) {
+        val width = containerSize.width.toFloat().coerceAtLeast(1f)
+        scrubProgress = (x / width).coerceIn(0f, 1f)
+    }
+
+    val density = LocalDensity.current
+    val progressBarTranslationY = with(density) {
+        (300.dp * (1f - enterProgress)).toPx()
+    }
+    val progressBarScale = lerpFloat(2.6f, 1f, enterProgress)
+    val progressBarAlpha = lerpFloat(0.18f, 1f, enterProgress)
 
     Box(
         modifier = modifier
-            .height(progressContainerHeight),
-        contentAlignment = Alignment.Center
+            .height(40.dp)
+            .onSizeChanged { size ->
+                containerSize = size
+            }
+            .pointerInput(enabled, durationMs, containerSize) {
+                if (!enabled || durationMs <= 0L) {
+                    return@pointerInput
+                }
+
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    try {
+                        isScrubbing = true
+                        onScrubbingChange(true)
+                        updateScrubProgress(down.position.x)
+                        down.consume()
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                                ?: event.changes.firstOrNull()
+                                ?: continue
+                            if (!change.pressed) {
+                                break
+                            }
+
+                            updateScrubProgress(change.position.x)
+                            change.consume()
+                        }
+
+                        val targetPositionMs = (durationMs * scrubProgress).toLong()
+                        onSeekTo(targetPositionMs)
+                    } finally {
+                        isScrubbing = false
+                        onScrubbingChange(false)
+                    }
+                }
+            }
     ) {
-        Box(
+        Canvas(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(progressTrackHeight)
-                .clip(shape)
-                .background(trackColor),
-            contentAlignment = Alignment.CenterStart
+                .matchParentSize()
+                .graphicsLayer {
+                    alpha = progressBarAlpha
+                    translationY = progressBarTranslationY
+                    scaleX = progressBarScale
+                    scaleY = progressBarScale
+                    transformOrigin = TransformOrigin.Center
+                }
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .height(progressTrackHeight)
-                    .clip(shape)
-                    .background(progressColor)
+            val centerY = size.height / 2f
+            val strokeWidth = animatedTrackHeight.toPx()
+            val inset = strokeWidth / 2f
+            val startX = inset
+            val endX = (size.width - inset).coerceAtLeast(startX)
+            val progressEndX = (startX + (endX - startX) * visibleProgress)
+                .coerceIn(startX, endX)
+            val shadowOffsetY = 3.dp.toPx()
+            val shadowBlurRadius = 8.dp.toPx()
+            val shadowAlpha = enterProgress * 0.14f
+            drawIntoCanvas { canvas ->
+                val paint = NativePaint().apply {
+                    isAntiAlias = true
+                    color = Color.Black.copy(alpha = shadowAlpha).toArgb()
+                    this.strokeWidth = strokeWidth
+                    strokeCap = NativePaint.Cap.ROUND
+                    maskFilter = BlurMaskFilter(
+                        shadowBlurRadius,
+                        BlurMaskFilter.Blur.NORMAL
+                    )
+                }
+                canvas.nativeCanvas.drawLine(
+                    startX,
+                    centerY + shadowOffsetY,
+                    endX,
+                    centerY + shadowOffsetY,
+                    paint
+                )
+            }
+            drawLine(
+                color = trackColor,
+                start = Offset(startX, centerY),
+                end = Offset(endX, centerY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
             )
+            if (visibleProgress > 0f) {
+                drawLine(
+                    color = activeProgressColor,
+                    start = Offset(startX, centerY),
+                    end = Offset(progressEndX, centerY),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+            }
         }
     }
 }

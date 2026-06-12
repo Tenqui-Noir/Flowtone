@@ -41,6 +41,8 @@ import ink.tenqui.flowtone.ui.components.MiniPlayer
 import ink.tenqui.flowtone.ui.screens.LibraryScreen
 import ink.tenqui.flowtone.viewmodel.MusicViewModel
 
+private const val MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS = 300
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlowtoneApp(
@@ -59,7 +61,7 @@ fun FlowtoneApp(
     val backgroundBlurProgress by animateFloatAsState(
         targetValue = if (hasCurrentSong && miniPlayerExpanded) 1f else 0f,
         animationSpec = tween(
-            durationMillis = 300,
+            durationMillis = MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS,
             easing = FastOutSlowInEasing
         ),
         label = "MiniPlayerBackgroundBlurProgress"
@@ -67,7 +69,7 @@ fun FlowtoneApp(
     val backgroundBlurRadius by animateDpAsState(
         targetValue = if (hasCurrentSong && miniPlayerExpanded) 12.dp else 0.dp,
         animationSpec = tween(
-            durationMillis = 300,
+            durationMillis = MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS,
             easing = FastOutSlowInEasing
         ),
         label = "MiniPlayerBackgroundBlur"
@@ -156,6 +158,7 @@ fun FlowtoneApp(
             onTogglePlayPause = musicViewModel::togglePlayPause,
             onPlayPrevious = musicViewModel::playPrevious,
             onPlayNext = musicViewModel::playNext,
+            onSeekTo = musicViewModel::seekTo,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }

@@ -7,11 +7,15 @@ import ink.tenqui.flowtone.data.AudioScanner
 import ink.tenqui.flowtone.model.Song
 import ink.tenqui.flowtone.playback.PlaybackController
 import ink.tenqui.flowtone.playback.PlaybackState
+import ink.tenqui.flowtone.playback.toSongOrNull
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -36,6 +40,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     val uiState: StateFlow<MusicUiState> = _uiState.asStateFlow()
     val playbackState: StateFlow<PlaybackState> = playbackController.playbackState
+
+    init {
+        startProgressTicker()
+        observeControllerConnection()
+    }
 
     fun setPermissionStatus(hasPermission: Boolean) {
         _uiState.update {
@@ -86,6 +95,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 )
             }
+
+            if (result.isSuccess) {
+                reconcileCurrentSongWithLibrary()
+                restoreFromControllerIfPossible()
+            }
         }
     }
 
@@ -132,8 +146,99 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         playbackController.updateCurrentSong(playbackQueue[songIndex])
     }
 
+    private fun observeControllerConnection() {
+        viewModelScope.launch {
+            playbackController.isConnected.collect { connected ->
+                if (connected) {
+                    restoreFromControllerIfPossible()
+                }
+            }
+        }
+    }
+
+    private fun restoreFromControllerIfPossible() {
+        val snapshot = playbackController.getPlaybackSnapshot() ?: return
+        val currentMediaItem = snapshot.currentMediaItem ?: return
+        val scannedSongs = _uiState.value.songs
+        val currentSong = currentMediaItem.toSongOrNull(scannedSongs) ?: return
+
+        val restoredQueue = if (snapshot.queueMediaItems.isNotEmpty()) {
+            snapshot.queueMediaItems.mapNotNull { mediaItem ->
+                mediaItem.toSongOrNull(scannedSongs)
+            }
+        } else {
+            listOf(currentSong)
+        }
+        if (restoredQueue.isEmpty()) {
+            return
+        }
+
+        playbackQueue = restoredQueue
+        currentQueueIndex = when {
+            snapshot.currentMediaItemIndex in restoredQueue.indices -> snapshot.currentMediaItemIndex
+            else -> restoredQueue.indexOfFirst { it.id == currentSong.id || it.uri == currentSong.uri }
+                .takeIf { it != -1 } ?: 0
+        }
+
+        val duration = when {
+            snapshot.durationMs > 0L -> snapshot.durationMs
+            currentSong.durationMs > 0L -> currentSong.durationMs
+            else -> 0L
+        }
+        val position = if (duration > 0L) {
+            snapshot.positionMs.coerceIn(0L, duration)
+        } else {
+            0L
+        }
+
+        playbackController.updateFromSnapshot(
+            currentSong = currentSong,
+            isPlaying = snapshot.isPlaying,
+            positionMs = position,
+            durationMs = duration
+        )
+    }
+
+    private fun reconcileCurrentSongWithLibrary() {
+        val scannedSongs = _uiState.value.songs
+        val currentSong = playbackState.value.currentSong ?: return
+        val officialSong = scannedSongs.firstOrNull {
+            it.id == currentSong.id || it.uri == currentSong.uri
+        } ?: return
+
+        playbackQueue = playbackQueue.map { queuedSong ->
+            scannedSongs.firstOrNull { it.id == queuedSong.id || it.uri == queuedSong.uri }
+                ?: queuedSong
+        }
+        currentQueueIndex = playbackQueue.indexOfFirst {
+            it.id == officialSong.id || it.uri == officialSong.uri
+        }
+        playbackController.updateFromSnapshot(
+            currentSong = officialSong,
+            isPlaying = playbackState.value.isPlaying,
+            positionMs = playbackState.value.positionMs,
+            durationMs = playbackState.value.durationMs.takeIf { it > 0L }
+                ?: officialSong.durationMs.coerceAtLeast(0L)
+        )
+    }
+
     fun togglePlayPause() {
         playbackController.togglePlayPause()
+    }
+
+    fun seekTo(positionMs: Long) {
+        val durationMs = playbackState.value.durationMs
+        val clampedPosition = if (durationMs > 0L) {
+            positionMs.coerceIn(0L, durationMs)
+        } else {
+            0L
+        }
+
+        playbackController.seekTo(clampedPosition)
+        playbackController.updateProgress(
+            positionMs = clampedPosition,
+            durationMs = durationMs
+        )
     }
 
     fun playNext() {
@@ -162,6 +267,43 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         playSongAt(index = previousIndex)
+    }
+
+    private fun startProgressTicker() {
+        viewModelScope.launch {
+            while (isActive) {
+                updateProgressFromController()
+                delay(500)
+            }
+        }
+    }
+
+    private fun updateProgressFromController() {
+        val currentSong = playbackState.value.currentSong
+        if (currentSong == null) {
+            playbackController.updateProgress(
+                positionMs = 0L,
+                durationMs = 0L
+            )
+            return
+        }
+
+        val controllerDuration = playbackController.getDurationMs()
+        val duration = when {
+            controllerDuration > 0L -> controllerDuration
+            currentSong.durationMs > 0L -> currentSong.durationMs
+            else -> 0L
+        }
+        val position = if (duration > 0L) {
+            playbackController.getCurrentPositionMs().coerceIn(0L, duration)
+        } else {
+            0L
+        }
+
+        playbackController.updateProgress(
+            positionMs = position,
+            durationMs = duration
+        )
     }
 
     override fun onCleared() {

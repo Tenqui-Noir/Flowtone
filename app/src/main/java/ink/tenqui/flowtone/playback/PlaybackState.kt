@@ -5,5 +5,7 @@ import ink.tenqui.flowtone.model.Song
 data class PlaybackState(
     val currentSong: Song? = null,
     val isPlaying: Boolean = false,
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
     val errorMessage: String? = null
 )
