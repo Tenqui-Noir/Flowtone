@@ -1089,12 +1089,15 @@ private fun SharedSongInfo(
     val textMeasurer = rememberTextMeasurer()
     val titleStyle = MaterialTheme.typography.titleMedium
     val artistStyle = MaterialTheme.typography.bodyMedium
+    val metadataLineHorizontalPadding = 6.dp
+    val minMetadataLineWidth = 48.dp
     val collapsedViewportX = 30.dp
     val collapsedControlsReservedWidth = 48.dp * 3f + 8.dp * 2f + 30.dp
     val collapsedViewportWidth = playerWidth - collapsedViewportX - collapsedControlsReservedWidth
     val collapsedViewportY = collapsedCenterY - metadataGroupHeight / 2f
     val expandedViewportWidth = playerWidth * 0.82f
     val expandedViewportX = (playerWidth - expandedViewportWidth) / 2f
+    val expandedViewportCenterX = expandedViewportX + expandedViewportWidth / 2f
     val expandedViewportY = expandedTop
     val viewportX = lerpDp(collapsedViewportX, expandedViewportX, progress)
     val viewportY = lerpDp(collapsedViewportY, expandedViewportY, progress)
@@ -1113,44 +1116,34 @@ private fun SharedSongInfo(
             maxLines = 1
         ).size.width.toDp()
     }
-    val rawTitleLineWidth = titleWidth + 12.dp
-    val titleLineWidth = when {
-        rawTitleLineWidth < 48.dp -> 48.dp
-        rawTitleLineWidth > expandedViewportWidth -> expandedViewportWidth
-        else -> rawTitleLineWidth
-    }
-    val rawArtistLineWidth = artistWidth + 12.dp
-    val artistLineWidth = when {
-        rawArtistLineWidth < 48.dp -> 48.dp
-        rawArtistLineWidth > expandedViewportWidth -> expandedViewportWidth
-        else -> rawArtistLineWidth
-    }
-    val titleVisualWidth = when {
-        titleWidth < 48.dp -> 48.dp
-        titleWidth > expandedViewportWidth -> expandedViewportWidth
-        else -> titleWidth
-    }
-    val artistVisualWidth = when {
-        artistWidth < 48.dp -> 48.dp
-        artistWidth > expandedViewportWidth -> expandedViewportWidth
-        else -> artistWidth
-    }
+    val titleLineBoxWidth = (titleWidth + metadataLineHorizontalPadding * 2f)
+        .coerceIn(minMetadataLineWidth, expandedViewportWidth)
+    val artistLineBoxWidth = (artistWidth + metadataLineHorizontalPadding * 2f)
+        .coerceIn(minMetadataLineWidth, expandedViewportWidth)
     val collapsedTitleX = 0.dp
-    val centeredTitleX = (viewportWidth - titleVisualWidth) / 2f
-    val expandedTitleX = if (centeredTitleX < 0.dp) {
+    val expandedTitleAbsoluteX = expandedViewportCenterX - titleLineBoxWidth / 2f
+    val expandedTitleRelativeX = expandedTitleAbsoluteX - expandedViewportX
+    val expandedTitleX = if (expandedTitleRelativeX < 0.dp) {
         0.dp
     } else {
-        centeredTitleX
+        expandedTitleRelativeX
     }
     val collapsedArtistX = 0.dp
-    val centeredArtistX = (viewportWidth - artistVisualWidth) / 2f
-    val expandedArtistX = if (centeredArtistX < 0.dp) {
+    val expandedArtistAbsoluteX = expandedViewportCenterX - artistLineBoxWidth / 2f
+    val expandedArtistRelativeX = expandedArtistAbsoluteX - expandedViewportX
+    val expandedArtistX = if (expandedArtistRelativeX < 0.dp) {
         0.dp
     } else {
-        centeredArtistX
+        expandedArtistRelativeX
     }
     val titleX = lerpDp(collapsedTitleX, expandedTitleX, progress)
     val artistX = lerpDp(collapsedArtistX, expandedArtistX, progress)
+    val lineHorizontalPadding = lerpDp(0.dp, metadataLineHorizontalPadding, progress)
+    val metadataTextAlign = if (progress > 0.85f) {
+        TextAlign.Center
+    } else {
+        TextAlign.Start
+    }
 
     Box(
         modifier = modifier
@@ -1169,29 +1162,41 @@ private fun SharedSongInfo(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start
         ) {
-            Text(
-                text = title,
-                style = titleStyle,
-                color = titleColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Start,
+            Box(
                 modifier = Modifier
-                    .width(titleLineWidth)
+                    .width(titleLineBoxWidth)
                     .offset(x = titleX)
-            )
-            Text(
-                text = artist,
-                style = artistStyle,
-                color = artistColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Start,
+            ) {
+                Text(
+                    text = title,
+                    style = titleStyle,
+                    color = titleColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = metadataTextAlign,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = lineHorizontalPadding)
+                )
+            }
+            Box(
                 modifier = Modifier
-                    .width(artistLineWidth)
+                    .width(artistLineBoxWidth)
                     .offset(x = artistX)
                     .padding(top = 4.dp)
-            )
+            ) {
+                Text(
+                    text = artist,
+                    style = artistStyle,
+                    color = artistColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = metadataTextAlign,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = lineHorizontalPadding)
+                )
+            }
         }
     }
 }
