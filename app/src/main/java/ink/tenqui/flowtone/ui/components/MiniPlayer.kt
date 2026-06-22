@@ -334,8 +334,8 @@ fun MiniPlayer(
     } else {
         playbackState.isPlaying
     }
-    fun lockPlayPauseVisual() {
-        lockedIsPlayingDuringScrub = visualIsPlaying
+    fun lockPlayPauseVisual(isPlayingToLock: Boolean) {
+        lockedIsPlayingDuringScrub = isPlayingToLock
         keepPlayPauseVisualLockedAfterSeek = true
         playPauseVisualLockToken += 1
     }
@@ -539,9 +539,6 @@ fun MiniPlayer(
                         onSeekTo = onSeekTo,
                         onLockPlayPauseVisual = ::lockPlayPauseVisual,
                         onScrubbingChange = { scrubbing ->
-                            if (scrubbing) {
-                                lockPlayPauseVisual()
-                            }
                             isProgressScrubbing = scrubbing
                         },
                         modifier = Modifier
@@ -557,7 +554,7 @@ fun MiniPlayer(
                         expandedTop = expandedControlsTop,
                         onPlayPrevious = {
                             if (hasCurrentSong) {
-                                lockPlayPauseVisual()
+                                lockPlayPauseVisual(playbackState.isPlaying)
                                 onPlayPrevious()
                             }
                         },
@@ -570,7 +567,7 @@ fun MiniPlayer(
                         },
                         onPlayNext = {
                             if (hasCurrentSong) {
-                                lockPlayPauseVisual()
+                                lockPlayPauseVisual(playbackState.isPlaying)
                                 onPlayNext()
                             }
                         },
@@ -1043,7 +1040,7 @@ private fun ExpandedOnlyContent(
     progressTrackColor: Color,
     progressColor: Color,
     onSeekTo: (Long) -> Unit,
-    onLockPlayPauseVisual: () -> Unit,
+    onLockPlayPauseVisual: (Boolean) -> Unit,
     onScrubbingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1327,7 +1324,7 @@ private fun PlaybackProgressBar(
     trackColor: Color,
     progressColor: Color,
     onSeekTo: (Long) -> Unit,
-    onLockPlayPauseVisual: () -> Unit,
+    onLockPlayPauseVisual: (Boolean) -> Unit,
     onScrubbingChange: (Boolean) -> Unit,
     enterProgress: Float,
     modifier: Modifier = Modifier
@@ -1431,6 +1428,7 @@ private fun PlaybackProgressBar(
         else -> trackSwitchVisualProgress
     }.coerceIn(0f, 1f)
     val currentVisibleProgress by rememberUpdatedState(visibleProgress)
+    val currentIsPlayingForVisualLock by rememberUpdatedState(isPlaying)
     SideEffect {
         if (!isScrubbing && !isTapSeeking) {
             lastRenderedProgress = visibleProgress.coerceIn(0f, 1f)
@@ -1586,7 +1584,7 @@ private fun PlaybackProgressBar(
                             isTapSeeking = false
                             isScrubbing = true
                             updateScrubProgress(x)
-                            onLockPlayPauseVisual()
+                            onLockPlayPauseVisual(currentIsPlayingForVisualLock)
                             onScrubbingChange(true)
                         }
 
@@ -1644,7 +1642,7 @@ private fun PlaybackProgressBar(
                             smoothPositionMs = targetPositionMs
                             anchorPositionMs = targetPositionMs
                             anchorFrameTimeNanos = 0L
-                            onLockPlayPauseVisual()
+                            onLockPlayPauseVisual(currentIsPlayingForVisualLock)
                             onSeekTo(targetPositionMs)
                             isScrubbing = false
                             onScrubbingChange(false)
@@ -1656,7 +1654,7 @@ private fun PlaybackProgressBar(
 
                             tapSeekJob?.cancel()
                             isTapSeeking = true
-                            onLockPlayPauseVisual()
+                            onLockPlayPauseVisual(currentIsPlayingForVisualLock)
                             onSeekTo(targetPositionMs)
                             smoothPositionMs = targetPositionMs
                             anchorPositionMs = targetPositionMs
