@@ -70,7 +70,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -654,7 +656,7 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4_800, easing = LinearEasing),
+            animation = tween(durationMillis = 1_200, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob1Drift"
@@ -663,7 +665,7 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6_400, easing = LinearEasing),
+            animation = tween(durationMillis = 1_560, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob2Drift"
@@ -672,7 +674,7 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 7_200, easing = LinearEasing),
+            animation = tween(durationMillis = 1_800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob3Drift"
@@ -681,95 +683,93 @@ private fun FlowCloudBackground(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9_500, easing = LinearEasing),
+            animation = tween(durationMillis = 2_300, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "FlowCloudBlob4Drift"
     )
 
-    Canvas(modifier = modifier) {
+    Canvas(
+        modifier = modifier.graphicsLayer {
+            compositingStrategy = CompositingStrategy.Offscreen
+        }
+    ) {
         val alphaMultiplier = 1f + progress * 0.08f
-        val minSide = size.minDimension
+        val base = size.maxDimension
+        val baseAlpha = 0.22f * alphaMultiplier
 
-        val blob1Radius = minSide * 0.62f
-        val blob2Radius = minSide * 0.54f
-        val blob3Radius = minSide * 0.48f
-        val blob4Radius = minSide * 0.42f
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0f to cloudColors[0].copy(alpha = 0.82f * alphaMultiplier),
-                    0.58f to cloudColors[0].copy(alpha = 0.30f * alphaMultiplier),
-                    1f to Color.Transparent
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    cloudColors[0].copy(alpha = baseAlpha),
+                    cloudColors[1].copy(alpha = baseAlpha * 0.70f),
+                    cloudColors[2].copy(alpha = baseAlpha * 0.82f)
                 ),
-                center = Offset(
-                    x = size.width * (-0.28f + blob1Drift * 0.50f),
-                    y = size.height * (-0.06f + blob1Drift * 0.36f)
-                ),
-                radius = blob1Radius
-            ),
-            radius = blob1Radius,
-            center = Offset(
-                x = size.width * (-0.28f + blob1Drift * 0.50f),
-                y = size.height * (-0.06f + blob1Drift * 0.36f)
+                start = Offset(size.width * -0.20f, size.height * 0.10f),
+                end = Offset(size.width * 1.20f, size.height * 0.95f)
             )
         )
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0f to cloudColors[1].copy(alpha = 0.68f * alphaMultiplier),
-                    0.6f to cloudColors[1].copy(alpha = 0.25f * alphaMultiplier),
-                    1f to Color.Transparent
+
+        fun drawCloudBlob(
+            color: Color,
+            centerX: Float,
+            centerY: Float,
+            radiusFactor: Float,
+            coreAlpha: Float
+        ) {
+            val center = Offset(size.width * centerX, size.height * centerY)
+            val radius = base * radiusFactor
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0f to color.copy(alpha = coreAlpha * alphaMultiplier),
+                        0.24f to color.copy(alpha = coreAlpha * 0.70f * alphaMultiplier),
+                        0.56f to color.copy(alpha = coreAlpha * 0.34f * alphaMultiplier),
+                        1f to Color.Transparent
+                    ),
+                    center = center,
+                    radius = radius
                 ),
-                center = Offset(
-                    x = size.width * (1.24f - blob2Drift * 0.46f),
-                    y = size.height * (-0.02f + blob2Drift * 0.28f)
-                ),
-                radius = blob2Radius
-            ),
-            radius = blob2Radius,
-            center = Offset(
-                x = size.width * (1.24f - blob2Drift * 0.46f),
-                y = size.height * (-0.02f + blob2Drift * 0.28f)
+                radius = radius,
+                center = center,
+                blendMode = BlendMode.Screen
             )
+        }
+
+        drawCloudBlob(
+            color = cloudColors[0],
+            centerX = -0.30f + blob1Drift * 0.56f,
+            centerY = -0.18f + blob1Drift * 0.42f,
+            radiusFactor = 1.20f,
+            coreAlpha = 0.42f
         )
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0f to cloudColors[2].copy(alpha = 0.58f * alphaMultiplier),
-                    0.62f to cloudColors[2].copy(alpha = 0.22f * alphaMultiplier),
-                    1f to Color.Transparent
-                ),
-                center = Offset(
-                    x = size.width * (0.46f - blob3Drift * 0.38f),
-                    y = size.height * (1.20f - blob3Drift * 0.40f)
-                ),
-                radius = blob3Radius
-            ),
-            radius = blob3Radius,
-            center = Offset(
-                x = size.width * (0.46f - blob3Drift * 0.38f),
-                y = size.height * (1.20f - blob3Drift * 0.40f)
-            )
+        drawCloudBlob(
+            color = cloudColors[1],
+            centerX = 1.30f - blob2Drift * 0.58f,
+            centerY = -0.22f + blob2Drift * 0.36f,
+            radiusFactor = 1.05f,
+            coreAlpha = 0.38f
         )
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0f to cloudColors[1].copy(alpha = 0.50f * alphaMultiplier),
-                    0.64f to cloudColors[1].copy(alpha = 0.18f * alphaMultiplier),
-                    1f to Color.Transparent
-                ),
-                center = Offset(
-                    x = size.width * (1.08f - blob4Drift * 0.28f),
-                    y = size.height * (1.08f - blob4Drift * 0.18f)
-                ),
-                radius = blob4Radius
-            ),
-            radius = blob4Radius,
-            center = Offset(
-                x = size.width * (1.08f - blob4Drift * 0.28f),
-                y = size.height * (1.08f - blob4Drift * 0.18f)
-            )
+        drawCloudBlob(
+            color = cloudColors[2],
+            centerX = 0.40f - blob3Drift * 0.34f,
+            centerY = 1.28f - blob3Drift * 0.54f,
+            radiusFactor = 1.35f,
+            coreAlpha = 0.36f
+        )
+        drawCloudBlob(
+            color = cloudColors[1],
+            centerX = 1.12f - blob4Drift * 0.34f,
+            centerY = 1.18f - blob4Drift * 0.26f,
+            radiusFactor = 0.86f,
+            coreAlpha = 0.30f
+        )
+        drawCloudBlob(
+            color = cloudColors[0],
+            centerX = 0.16f + blob2Drift * 0.38f,
+            centerY = 0.42f + blob3Drift * 0.18f,
+            radiusFactor = 0.68f,
+            coreAlpha = 0.24f
         )
     }
 }
