@@ -1,6 +1,9 @@
 ﻿package ink.tenqui.flowtone.ui.components
 
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
+import android.graphics.Color as AndroidColor
 import android.graphics.Paint as NativePaint
 import android.graphics.RectF
 import androidx.compose.animation.core.Animatable
@@ -95,7 +98,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.palette.graphics.Palette
 import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -103,6 +105,9 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.request.crossfade
 import coil3.toBitmap
+import com.google.android.material.color.utilities.CorePalette
+import com.google.android.material.color.utilities.QuantizerCelebi
+import com.google.android.material.color.utilities.Score
 import ink.tenqui.flowtone.playback.PlaybackOrderMode
 import ink.tenqui.flowtone.playback.PlaybackState
 import kotlinx.coroutines.Dispatchers
@@ -236,38 +241,29 @@ fun MiniPlayer(
             context.imageLoader.enqueue(request)
         }
     }
-    val fallbackCloudColors = listOf(
-        MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.secondaryContainer,
-        MaterialTheme.colorScheme.tertiaryContainer
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val fallbackSeedColor = MaterialTheme.colorScheme.primary.toArgb()
+    val fallbackCloudColors = materialYouCloudColors(
+        seedColor = fallbackSeedColor,
+        isDarkTheme = isDarkTheme
     )
     var extractedCloudColors by remember {
         mutableStateOf<List<Color>?>(null)
     }
-    LaunchedEffect(paletteImageRequest) {
+    LaunchedEffect(paletteImageRequest, fallbackSeedColor, isDarkTheme) {
         extractedCloudColors = paletteImageRequest?.let { request ->
             runCatching {
                 withContext(Dispatchers.Default) {
                     val result = context.imageLoader.execute(request)
                     val bitmap = (result as? SuccessResult)?.image?.toBitmap(128, 128)
                     bitmap?.let { sourceBitmap ->
-                        val palette = Palette.from(sourceBitmap).generate()
-                        listOf(
-                            Color(
-                                palette.vibrantSwatch?.rgb
-                                    ?: palette.dominantSwatch?.rgb
-                                    ?: palette.getDominantColor(android.graphics.Color.DKGRAY)
-                            ),
-                            Color(
-                                palette.mutedSwatch?.rgb
-                                    ?: palette.darkVibrantSwatch?.rgb
-                                    ?: palette.getMutedColor(android.graphics.Color.GRAY)
-                            ),
-                            Color(
-                                palette.lightVibrantSwatch?.rgb
-                                    ?: palette.lightMutedSwatch?.rgb
-                                    ?: palette.getLightMutedColor(android.graphics.Color.LTGRAY)
-                            )
+                        val seedColor = extractMaterialYouSeedColor(
+                            bitmap = sourceBitmap,
+                            fallbackColor = fallbackSeedColor
+                        )
+                        materialYouCloudColors(
+                            seedColor = seedColor,
+                            isDarkTheme = isDarkTheme
                         )
                     }
                 }
@@ -275,24 +271,6 @@ fun MiniPlayer(
         }
     }
     val cloudColors = extractedCloudColors ?: fallbackCloudColors
-    val cloudBrightenFactor = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-        1.20f
-    } else {
-        1.32f
-    }
-    val cloudBrightenOffset = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-        0.06f
-    } else {
-        0.10f
-    }
-    val brightCloudColors = cloudColors.map { color ->
-        Color(
-            red = (color.red * cloudBrightenFactor + cloudBrightenOffset).coerceIn(0f, 1f),
-            green = (color.green * cloudBrightenFactor + cloudBrightenOffset).coerceIn(0f, 1f),
-            blue = (color.blue * cloudBrightenFactor + cloudBrightenOffset).coerceIn(0f, 1f),
-            alpha = color.alpha
-        )
-    }
     val noRippleInteractionSource = remember { MutableInteractionSource() }
     val titleColor = if (hasArtworkBackground) {
         Color.White
@@ -483,7 +461,7 @@ fun MiniPlayer(
                     modifier = Modifier.matchParentSize()
                 )
                 CrossfadeFlowCloudBackground(
-                    colors = brightCloudColors,
+                    colors = cloudColors,
                     progress = animationProgress,
                     modifier = Modifier.matchParentSize()
                 )
@@ -600,9 +578,14 @@ fun MiniPlayer(
                                 val targetX = progressLeft
                                 val hiddenX = -buttonSize - 32.dp
                                 val buttonX = lerpDp(hiddenX, targetX, sideButtonProgress)
-                                val buttonY = expandedControlsTop + 16.dp
+                                val targetY = expandedControlsTop + 16.dp
+                                val hiddenY = targetY + 96.dp
+                                val buttonY = lerpDp(hiddenY, targetY, sideButtonProgress)
+                                val buttonScale = lerpFloat(2.0f, 1.0f, sideButtonProgress)
                                 translationX = buttonX.toPx()
                                 translationY = buttonY.toPx()
+                                scaleX = buttonScale
+                                scaleY = buttonScale
                                 alpha = sideButtonProgress
                             }
                             .size(48.dp)
@@ -623,9 +606,14 @@ fun MiniPlayer(
                                 val targetX = progressLeft + progressWidth - buttonSize
                                 val hiddenX = playerWidth + 32.dp
                                 val buttonX = lerpDp(hiddenX, targetX, sideButtonProgress)
-                                val buttonY = expandedControlsTop + 16.dp
+                                val targetY = expandedControlsTop + 16.dp
+                                val hiddenY = targetY + 96.dp
+                                val buttonY = lerpDp(hiddenY, targetY, sideButtonProgress)
+                                val buttonScale = lerpFloat(2.0f, 1.0f, sideButtonProgress)
                                 translationX = buttonX.toPx()
                                 translationY = buttonY.toPx()
+                                scaleX = buttonScale
+                                scaleY = buttonScale
                                 alpha = sideButtonProgress
                             }
                             .size(48.dp)
@@ -688,6 +676,7 @@ private fun FlowCloudBackground(
         ),
         label = "FlowCloudBlob4Drift"
     )
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
 
     Canvas(
         modifier = modifier.graphicsLayer {
@@ -696,14 +685,19 @@ private fun FlowCloudBackground(
     ) {
         val alphaMultiplier = 1f + progress * 0.08f
         val base = size.maxDimension
-        val baseAlpha = 0.22f * alphaMultiplier
+        val baseAlpha = 0.14f * alphaMultiplier
+        val cloudBlendMode = if (isDarkTheme) {
+            BlendMode.Screen
+        } else {
+            BlendMode.SrcOver
+        }
 
         drawRect(
             brush = Brush.linearGradient(
                 colors = listOf(
                     cloudColors[0].copy(alpha = baseAlpha),
                     cloudColors[1].copy(alpha = baseAlpha * 0.70f),
-                    cloudColors[2].copy(alpha = baseAlpha * 0.82f)
+                    cloudColors[2].copy(alpha = baseAlpha * 0.86f)
                 ),
                 start = Offset(size.width * -0.20f, size.height * 0.10f),
                 end = Offset(size.width * 1.20f, size.height * 0.95f)
@@ -722,17 +716,18 @@ private fun FlowCloudBackground(
             drawCircle(
                 brush = Brush.radialGradient(
                     colorStops = arrayOf(
-                        0f to color.copy(alpha = coreAlpha * alphaMultiplier),
-                        0.24f to color.copy(alpha = coreAlpha * 0.70f * alphaMultiplier),
-                        0.56f to color.copy(alpha = coreAlpha * 0.34f * alphaMultiplier),
-                        1f to Color.Transparent
+                        0.00f to color.copy(alpha = coreAlpha * alphaMultiplier),
+                        0.22f to color.copy(alpha = coreAlpha * 0.72f * alphaMultiplier),
+                        0.48f to color.copy(alpha = coreAlpha * 0.39f * alphaMultiplier),
+                        0.72f to color.copy(alpha = coreAlpha * 0.14f * alphaMultiplier),
+                        1.00f to Color.Transparent
                     ),
                     center = center,
                     radius = radius
                 ),
                 radius = radius,
                 center = center,
-                blendMode = BlendMode.Screen
+                blendMode = cloudBlendMode
             )
         }
 
@@ -740,36 +735,36 @@ private fun FlowCloudBackground(
             color = cloudColors[0],
             centerX = -0.30f + blob1Drift * 0.56f,
             centerY = -0.18f + blob1Drift * 0.42f,
-            radiusFactor = 1.20f,
-            coreAlpha = 0.42f
+            radiusFactor = 1.02f,
+            coreAlpha = 0.72f
         )
         drawCloudBlob(
             color = cloudColors[1],
             centerX = 1.30f - blob2Drift * 0.58f,
             centerY = -0.22f + blob2Drift * 0.36f,
-            radiusFactor = 1.05f,
-            coreAlpha = 0.38f
+            radiusFactor = 0.84f,
+            coreAlpha = 0.66f
         )
         drawCloudBlob(
             color = cloudColors[2],
             centerX = 0.40f - blob3Drift * 0.34f,
             centerY = 1.28f - blob3Drift * 0.54f,
-            radiusFactor = 1.35f,
-            coreAlpha = 0.36f
+            radiusFactor = 1.18f,
+            coreAlpha = 0.62f
         )
         drawCloudBlob(
             color = cloudColors[1],
             centerX = 1.12f - blob4Drift * 0.34f,
             centerY = 1.18f - blob4Drift * 0.26f,
-            radiusFactor = 0.86f,
-            coreAlpha = 0.30f
+            radiusFactor = 0.66f,
+            coreAlpha = 0.54f
         )
         drawCloudBlob(
             color = cloudColors[0],
             centerX = 0.16f + blob2Drift * 0.38f,
             centerY = 0.42f + blob3Drift * 0.18f,
-            radiusFactor = 0.68f,
-            coreAlpha = 0.24f
+            radiusFactor = 0.48f,
+            coreAlpha = 0.46f
         )
     }
 }
@@ -1824,6 +1819,52 @@ private fun ExpandedArtwork(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@SuppressLint("RestrictedApi")
+private fun extractMaterialYouSeedColor(
+    bitmap: Bitmap,
+    fallbackColor: Int
+): Int {
+    return runCatching {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        val opaquePixels = pixels.filter { color ->
+            AndroidColor.alpha(color) >= 0x80
+        }.toIntArray()
+
+        if (opaquePixels.isEmpty()) {
+            fallbackColor
+        } else {
+            val quantized = QuantizerCelebi.quantize(opaquePixels, 128)
+            Score.score(quantized).firstOrNull() ?: fallbackColor
+        }
+    }.getOrDefault(fallbackColor)
+}
+
+@SuppressLint("RestrictedApi")
+private fun materialYouCloudColors(
+    seedColor: Int,
+    isDarkTheme: Boolean
+): List<Color> {
+    val corePalette = CorePalette.of(seedColor)
+
+    return if (isDarkTheme) {
+        listOf(
+            Color(corePalette.a1.tone(68)),
+            Color(corePalette.a2.tone(78)),
+            Color(corePalette.a3.tone(88))
+        )
+    } else {
+        listOf(
+            Color(corePalette.a1.tone(62)),
+            Color(corePalette.a2.tone(72)),
+            Color(corePalette.a3.tone(82))
+        )
     }
 }
 
