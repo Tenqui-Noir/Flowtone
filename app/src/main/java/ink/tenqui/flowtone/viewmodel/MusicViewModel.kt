@@ -4,7 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ink.tenqui.flowtone.data.local.AudioScanner
+import ink.tenqui.flowtone.data.local.LocalMusicRepository
 import ink.tenqui.flowtone.data.local.PlaybackSettingsStore
+import ink.tenqui.flowtone.data.repository.MusicRepository
 import ink.tenqui.flowtone.core.model.Song
 import ink.tenqui.flowtone.playback.PlaybackController
 import ink.tenqui.flowtone.playback.PlaybackOrderMode
@@ -30,7 +32,11 @@ data class MusicUiState(
 )
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
-    private val audioScanner = AudioScanner(application.contentResolver)
+    private val musicRepository = MusicRepository(
+        localMusicRepository = LocalMusicRepository(
+            audioScanner = AudioScanner(application.contentResolver)
+        )
+    )
     private val playbackSettingsStore = PlaybackSettingsStore(application)
     private val playbackController = PlaybackController(
         context = application,
@@ -74,7 +80,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    audioScanner.scanSongs()
+                    musicRepository.loadLocalSongs()
                 }
             }
 
