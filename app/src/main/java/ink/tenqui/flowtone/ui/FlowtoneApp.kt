@@ -46,7 +46,9 @@ private const val MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS = 300
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlowtoneApp(
-    musicViewModel: MusicViewModel = viewModel()
+    musicViewModel: MusicViewModel = viewModel(),
+    openExpandedPlayerRequest: Int = 0,
+    onOpenExpandedPlayerRequestConsumed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by musicViewModel.uiState.collectAsState()
@@ -92,6 +94,21 @@ fun FlowtoneApp(
     LaunchedEffect(playbackState.currentSong) {
         if (playbackState.currentSong == null) {
             miniPlayerExpanded = false
+        }
+    }
+
+    LaunchedEffect(openExpandedPlayerRequest, hasCurrentSong, uiState.hasScanned, uiState.songs) {
+        if (openExpandedPlayerRequest == 0) {
+            return@LaunchedEffect
+        }
+
+        if (hasCurrentSong) {
+            if (!miniPlayerExpanded) {
+                miniPlayerExpanded = true
+            }
+            onOpenExpandedPlayerRequestConsumed()
+        } else if (uiState.hasScanned && uiState.songs.isEmpty()) {
+            onOpenExpandedPlayerRequestConsumed()
         }
     }
 

@@ -1,5 +1,7 @@
 package ink.tenqui.flowtone.playback
 
+import android.app.PendingIntent
+import android.content.Intent
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
@@ -12,6 +14,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import ink.tenqui.flowtone.MainActivity
 import ink.tenqui.flowtone.R
 
 class FlowtoneMediaSessionService : MediaSessionService() {
@@ -97,6 +100,7 @@ class FlowtoneMediaSessionService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, servicePlayer)
             .setId("flowtone_service_session")
             .setCallback(sessionCallback)
+            .setSessionActivity(buildOpenExpandedPlayerPendingIntent())
             .setMediaButtonPreferences(
                 listOf(buildPlaybackOrderCommandButton(currentPlaybackOrderMode(servicePlayer)))
             )
@@ -122,6 +126,21 @@ class FlowtoneMediaSessionService : MediaSessionService() {
     private fun updatePlaybackOrderButton() {
         mediaSession?.setMediaButtonPreferences(
             listOf(buildPlaybackOrderCommandButton(currentPlaybackOrderMode()))
+        )
+    }
+
+    private fun buildOpenExpandedPlayerPendingIntent(): PendingIntent {
+        val openPlayerIntent = Intent(this, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_OPEN_EXPANDED_PLAYER
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_EXPAND_MINI_PLAYER, true)
+        }
+
+        return PendingIntent.getActivity(
+            this,
+            OPEN_EXPANDED_PLAYER_REQUEST_CODE,
+            openPlayerIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
@@ -182,5 +201,9 @@ class FlowtoneMediaSessionService : MediaSessionService() {
             this == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
             this == Player.COMMAND_SEEK_TO_PREVIOUS ||
             this == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
+    }
+
+    private companion object {
+        const val OPEN_EXPANDED_PLAYER_REQUEST_CODE = 1001
     }
 }
