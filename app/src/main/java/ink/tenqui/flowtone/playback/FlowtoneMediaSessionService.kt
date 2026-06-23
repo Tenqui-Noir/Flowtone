@@ -89,7 +89,9 @@ class FlowtoneMediaSessionService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        val servicePlayer = ExoPlayer.Builder(applicationContext).build()
+        val servicePlayer = ExoPlayer.Builder(applicationContext)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
         servicePlayer.addListener(playerListener)
         player = servicePlayer
         mediaSession = MediaSession.Builder(this, servicePlayer)
