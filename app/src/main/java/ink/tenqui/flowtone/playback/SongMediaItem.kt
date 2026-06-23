@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import ink.tenqui.flowtone.core.model.Song
+import ink.tenqui.flowtone.core.model.SourceType
 
 private const val EXTRA_SONG_ID = "song_id"
 private const val EXTRA_SONG_URI = "song_uri"
@@ -53,6 +54,7 @@ fun MediaItem.toSongOrNull(scannedSongs: List<Song>): Song? {
 
     return Song(
         id = songId ?: uri.toString().hashCode().toLong(),
+        sourceType = SourceType.Local,
         title = title,
         artist = artist,
         durationMs = durationMs,

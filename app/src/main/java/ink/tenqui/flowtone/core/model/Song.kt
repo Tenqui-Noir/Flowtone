@@ -4,6 +4,7 @@ import android.net.Uri
 
 data class Song(
     val id: Long,
+    val sourceType: SourceType,
     val title: String,
     val artist: String,
     val durationMs: Long,

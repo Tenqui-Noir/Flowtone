@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import ink.tenqui.flowtone.core.model.Song
+import ink.tenqui.flowtone.core.model.SourceType
 
 class AudioScanner(
     private val contentResolver: ContentResolver
@@ -60,6 +61,7 @@ class AudioScanner(
                 songs.add(
                     Song(
                         id = id,
+                        sourceType = SourceType.Local,
                         title = title,
                         artist = artist,
                         durationMs = durationMs,
