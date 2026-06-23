@@ -3,6 +3,44 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val appVersionName = "0.7.1"
+
+fun versionCodeFromName(versionName: String): Int {
+    val parts = versionName.split(".")
+    require(parts.size == 3 || parts.size == 4) {
+        "versionName must use major.minor.patch or major.minor.patch.build format: $versionName"
+    }
+
+    val numbers = parts.mapIndexed { index, part ->
+        require(part.isNotBlank()) {
+            "versionName segment ${index + 1} is blank: $versionName"
+        }
+        part.toIntOrNull() ?: error(
+            "versionName segment ${index + 1} must be an integer: $versionName"
+        )
+    }
+
+    val major = numbers[0]
+    val minor = numbers[1]
+    val patch = numbers[2]
+    val build = numbers.getOrElse(3) { 0 }
+
+    require(major >= 0) {
+        "versionName major must be >= 0: $versionName"
+    }
+    require(minor in 0..99) {
+        "versionName minor must be in 0..99: $versionName"
+    }
+    require(patch in 0..99) {
+        "versionName patch must be in 0..99: $versionName"
+    }
+    require(build in 0..99) {
+        "versionName build must be in 0..99: $versionName"
+    }
+
+    return major * 1_000_000 + minor * 10_000 + patch * 100 + build
+}
+
 android {
     namespace = "ink.tenqui.flowtone"
     compileSdk {
@@ -15,8 +53,8 @@ android {
         applicationId = "ink.tenqui.flowtone"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = versionCodeFromName(appVersionName)
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
