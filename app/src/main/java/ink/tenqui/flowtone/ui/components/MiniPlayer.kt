@@ -7,6 +7,12 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Paint as NativePaint
 import android.graphics.RectF
 import android.util.Log
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.CubicBezierEasing
@@ -97,6 +103,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -143,6 +150,7 @@ fun MiniPlayer(
     val hasCurrentSong = currentSong != null
     val title = currentSong?.title.orEmpty()
     val artist = currentSong?.artist.orEmpty()
+    var collapsedMetadataSwitchDirection by remember { mutableStateOf(1) }
     val artworkUri = currentSong?.artworkUri
     val durationMs = when {
         playbackState.durationMs > 0L -> playbackState.durationMs
@@ -564,6 +572,7 @@ fun MiniPlayer(
                         playerWidth = playerWidth,
                         collapsedHeight = collapsedHeight,
                         expandedTop = expandedMetadataTop,
+                        switchDirection = collapsedMetadataSwitchDirection,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                     )
@@ -594,6 +603,7 @@ fun MiniPlayer(
                         expandedTop = expandedControlsTop,
                         onPlayPrevious = {
                             if (hasCurrentSong) {
+                                collapsedMetadataSwitchDirection = -1
                                 lockPlayPauseVisual(playbackState.isPlaying)
                                 onPlayPrevious()
                             }
@@ -607,6 +617,7 @@ fun MiniPlayer(
                         },
                         onPlayNext = {
                             if (hasCurrentSong) {
+                                collapsedMetadataSwitchDirection = 1
                                 lockPlayPauseVisual(playbackState.isPlaying)
                                 onPlayNext()
                             }
@@ -1102,6 +1113,7 @@ private fun SharedSongInfo(
     playerWidth: Dp,
     collapsedHeight: Dp,
     expandedTop: Dp,
+    switchDirection: Int,
     modifier: Modifier = Modifier
 ) {
     val metadataGroupHeight = 60.dp
@@ -1123,63 +1135,61 @@ private fun SharedSongInfo(
     val viewportX = lerpDp(collapsedViewportX, expandedViewportX, progress)
     val viewportY = lerpDp(collapsedViewportY, expandedViewportY, progress)
     val viewportWidth = lerpDp(collapsedViewportWidth, expandedViewportWidth, progress)
-    val titleWidth = with(density) {
-        textMeasurer.measure(
-            text = AnnotatedString(title),
-            style = titleStyle,
-            maxLines = 1
-        ).size.width.toDp()
-    }
-    val artistWidth = with(density) {
-        textMeasurer.measure(
-            text = AnnotatedString(artist),
-            style = artistStyle,
-            maxLines = 1
-        ).size.width.toDp()
-    }
-    val titleLineBoxWidth = (titleWidth + metadataLineHorizontalPadding * 2f)
-        .coerceIn(minMetadataLineWidth, expandedViewportWidth)
-    val artistLineBoxWidth = (artistWidth + metadataLineHorizontalPadding * 2f)
-        .coerceIn(minMetadataLineWidth, expandedViewportWidth)
-    val collapsedTitleX = 0.dp
-    val expandedTitleContentWidth = titleWidth.coerceAtMost(
-        expandedViewportWidth - metadataLineHorizontalPadding * 2f
-    )
-    val expandedTitleAbsoluteX =
-        expandedViewportCenterX - expandedTitleContentWidth / 2f - metadataLineHorizontalPadding
-    val expandedTitleRelativeX = expandedTitleAbsoluteX - expandedViewportX
-    val expandedTitleX = if (expandedTitleRelativeX < 0.dp) {
-        0.dp
-    } else {
-        expandedTitleRelativeX
-    }
-    val collapsedArtistX = 0.dp
-    val expandedArtistContentWidth = artistWidth.coerceAtMost(
-        expandedViewportWidth - metadataLineHorizontalPadding * 2f
-    )
-    val expandedArtistAbsoluteX =
-        expandedViewportCenterX - expandedArtistContentWidth / 2f - metadataLineHorizontalPadding
-    val expandedArtistRelativeX = expandedArtistAbsoluteX - expandedViewportX
-    val expandedArtistX = if (expandedArtistRelativeX < 0.dp) {
-        0.dp
-    } else {
-        expandedArtistRelativeX
-    }
-    val titleX = lerpDp(collapsedTitleX, expandedTitleX, progress)
-    val artistX = lerpDp(collapsedArtistX, expandedArtistX, progress)
     val lineHorizontalPadding = lerpDp(0.dp, metadataLineHorizontalPadding, progress)
     val metadataTextAlign = TextAlign.Start
+    val metadataState = remember(title, artist) {
+        CollapsedMetadataState(title = title, artist = artist)
+    }
+    val shouldAnimateCollapsedMetadataChange = progress <= 0.01f
+    val metadataSwitchDistancePx = with(density) { 20.dp.roundToPx() }
 
-    Box(
-        modifier = modifier
-            .width(viewportWidth)
-            .height(metadataGroupHeight)
-            .graphicsLayer {
-                translationX = viewportX.toPx()
-                translationY = viewportY.toPx()
-            }
-            .clipToBounds()
-    ) {
+    @Composable
+    fun MetadataTextBlock(blockTitle: String, blockArtist: String) {
+        val titleWidth = with(density) {
+            textMeasurer.measure(
+                text = AnnotatedString(blockTitle),
+                style = titleStyle,
+                maxLines = 1
+            ).size.width.toDp()
+        }
+        val artistWidth = with(density) {
+            textMeasurer.measure(
+                text = AnnotatedString(blockArtist),
+                style = artistStyle,
+                maxLines = 1
+            ).size.width.toDp()
+        }
+        val titleLineBoxWidth = (titleWidth + metadataLineHorizontalPadding * 2f)
+            .coerceIn(minMetadataLineWidth, expandedViewportWidth)
+        val artistLineBoxWidth = (artistWidth + metadataLineHorizontalPadding * 2f)
+            .coerceIn(minMetadataLineWidth, expandedViewportWidth)
+        val collapsedTitleX = 0.dp
+        val expandedTitleContentWidth = titleWidth.coerceAtMost(
+            expandedViewportWidth - metadataLineHorizontalPadding * 2f
+        )
+        val expandedTitleAbsoluteX =
+            expandedViewportCenterX - expandedTitleContentWidth / 2f - metadataLineHorizontalPadding
+        val expandedTitleRelativeX = expandedTitleAbsoluteX - expandedViewportX
+        val expandedTitleX = if (expandedTitleRelativeX < 0.dp) {
+            0.dp
+        } else {
+            expandedTitleRelativeX
+        }
+        val collapsedArtistX = 0.dp
+        val expandedArtistContentWidth = artistWidth.coerceAtMost(
+            expandedViewportWidth - metadataLineHorizontalPadding * 2f
+        )
+        val expandedArtistAbsoluteX =
+            expandedViewportCenterX - expandedArtistContentWidth / 2f - metadataLineHorizontalPadding
+        val expandedArtistRelativeX = expandedArtistAbsoluteX - expandedViewportX
+        val expandedArtistX = if (expandedArtistRelativeX < 0.dp) {
+            0.dp
+        } else {
+            expandedArtistRelativeX
+        }
+        val titleX = lerpDp(collapsedTitleX, expandedTitleX, progress)
+        val artistX = lerpDp(collapsedArtistX, expandedArtistX, progress)
+
         Column(
             modifier = Modifier
                 .width(viewportWidth)
@@ -1193,7 +1203,7 @@ private fun SharedSongInfo(
                     .offset(x = titleX)
             ) {
                 Text(
-                    text = title,
+                    text = blockTitle,
                     style = titleStyle,
                     color = titleColor,
                     maxLines = 1,
@@ -1211,7 +1221,7 @@ private fun SharedSongInfo(
                     .padding(top = 4.dp)
             ) {
                 Text(
-                    text = artist,
+                    text = blockArtist,
                     style = artistStyle,
                     color = artistColor,
                     maxLines = 1,
@@ -1224,7 +1234,76 @@ private fun SharedSongInfo(
             }
         }
     }
+
+    Box(
+        modifier = modifier
+            .width(viewportWidth)
+            .height(metadataGroupHeight)
+            .graphicsLayer {
+                translationX = viewportX.toPx()
+                translationY = viewportY.toPx()
+            }
+            .clipToBounds()
+    ) {
+        if (shouldAnimateCollapsedMetadataChange) {
+            AnimatedContent(
+                targetState = metadataState,
+                modifier = Modifier
+                    .width(viewportWidth)
+                    .height(metadataGroupHeight),
+                transitionSpec = {
+                    val direction = if (switchDirection < 0) {
+                        -1
+                    } else {
+                        1
+                    }
+                    val animationSpec = tween<IntOffset>(
+                        durationMillis = 260,
+                        easing = TrackSwitchProgressEasing
+                    )
+                    (
+                        slideInHorizontally(
+                            animationSpec = animationSpec,
+                            initialOffsetX = { metadataSwitchDistancePx * direction }
+                        ) + fadeIn(
+                            animationSpec = tween(
+                                durationMillis = 260,
+                                easing = TrackSwitchProgressEasing
+                            )
+                        )
+                    ).togetherWith(
+                        slideOutHorizontally(
+                            animationSpec = animationSpec,
+                            targetOffsetX = { -metadataSwitchDistancePx * direction }
+                        ) + fadeOut(
+                            animationSpec = tween(
+                                durationMillis = 260,
+                                easing = TrackSwitchProgressEasing
+                            )
+                        )
+                    )
+                },
+                contentAlignment = Alignment.CenterStart,
+                label = "CollapsedMetadataSwitch"
+            ) { state ->
+                MetadataTextBlock(
+                    blockTitle = state.title,
+                    blockArtist = state.artist
+                )
+            }
+        } else {
+            MetadataTextBlock(
+                blockTitle = title,
+                blockArtist = artist
+            )
+        }
+    }
 }
+
+private data class CollapsedMetadataState(
+    val title: String,
+    val artist: String
+)
 
 @Composable
 private fun SharedPlaybackControls(
