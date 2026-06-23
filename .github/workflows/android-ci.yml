@@ -1,0 +1,33 @@
+name: Android CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android debug checks
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Assemble debug
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Lint debug
+        run: ./gradlew :app:lintDebug --no-daemon
+
+      - name: Run debug unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
