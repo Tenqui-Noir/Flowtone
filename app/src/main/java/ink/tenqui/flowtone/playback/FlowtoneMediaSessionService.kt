@@ -31,6 +31,18 @@ class FlowtoneMediaSessionService : MediaSessionService() {
         }
     }
     private val sessionCallback = object : MediaSession.Callback {
+        @Suppress("DEPRECATION")
+        override fun onPlayerCommandRequest(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            playerCommand: Int
+        ): Int {
+            if (playerCommand.isUserSkipCommand()) {
+                player?.playWhenReady = true
+            }
+            return SessionResult.RESULT_SUCCESS
+        }
+
         @OptIn(UnstableApi::class)
         override fun onConnect(
             session: MediaSession,
@@ -161,5 +173,12 @@ class FlowtoneMediaSessionService : MediaSessionService() {
                 servicePlayer.repeatMode = Player.REPEAT_MODE_OFF
             }
         }
+    }
+
+    private fun Int.isUserSkipCommand(): Boolean {
+        return this == Player.COMMAND_SEEK_TO_NEXT ||
+            this == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
+            this == Player.COMMAND_SEEK_TO_PREVIOUS ||
+            this == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
     }
 }
