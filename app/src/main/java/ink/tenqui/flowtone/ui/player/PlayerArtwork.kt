@@ -108,25 +108,19 @@ internal fun MorphArtworkLayer(
     imageRequest: ImageRequest?,
     progress: Float,
     playerWidth: Dp,
-    collapsedHeight: Dp,
     expandedArtworkSize: Dp,
     expandedArtworkTop: Dp,
     modifier: Modifier = Modifier
 ) {
-    val collapsedX = 0.dp
-    val collapsedY = 0.dp
-    val collapsedWidth = playerWidth
     val expandedX = (playerWidth - expandedArtworkSize) / 2f
-    val expandedY = expandedArtworkTop
-    val artworkX = lerpDp(collapsedX, expandedX, progress)
-    val artworkY = lerpDp(collapsedY, expandedY, progress)
-    val artworkWidth = lerpDp(collapsedWidth, expandedArtworkSize, progress)
-    val artworkHeight = lerpDp(collapsedHeight, expandedArtworkSize, progress)
+    val artworkX = expandedX
+    val artworkY = expandedArtworkTop
+    val artworkSize = expandedArtworkSize
     val blurRadius = lerpDp(16.dp, 0.dp, progress)
     val cornerRadius = lerpDp(24.dp, 28.dp, progress)
     val shadowPadding = 32.dp
     val shadowProgress = progress.coerceIn(0f, 1f)
-    val imageScale = lerpFloat(1.22f, 1f, progress)
+    val containerScale = lerpFloat(2f, 1f, progress)
     val collapsedArtworkDimAlpha = lerpFloat(0.38f, 0f, progress)
     val coverShape = RoundedCornerShape(cornerRadius)
     val blurModifier = if (blurRadius > 0.5.dp) {
@@ -138,8 +132,8 @@ internal fun MorphArtworkLayer(
     Box(
         modifier = modifier
             .offset(x = artworkX - shadowPadding, y = artworkY - shadowPadding)
-            .width(artworkWidth + shadowPadding * 2)
-            .height(artworkHeight + shadowPadding * 2)
+            .width(artworkSize + shadowPadding * 2)
+            .height(artworkSize + shadowPadding * 2)
             .graphicsLayer {
                 alpha = 1f
             }
@@ -162,8 +156,8 @@ internal fun MorphArtworkLayer(
                     val rect = RectF(
                         shadowPaddingPx,
                         shadowPaddingPx + shadowOffsetY,
-                        shadowPaddingPx + artworkWidth.toPx(),
-                        shadowPaddingPx + artworkHeight.toPx() + shadowOffsetY
+                        shadowPaddingPx + artworkSize.toPx(),
+                        shadowPaddingPx + artworkSize.toPx() + shadowOffsetY
                     )
                     canvas.nativeCanvas.drawRoundRect(
                         rect,
@@ -177,11 +171,14 @@ internal fun MorphArtworkLayer(
         Box(
             modifier = Modifier
                 .offset(x = shadowPadding, y = shadowPadding)
-                .width(artworkWidth)
-                .height(artworkHeight)
+                .width(artworkSize)
+                .height(artworkSize)
                 .graphicsLayer {
                     shape = coverShape
                     clip = true
+                    scaleX = containerScale
+                    scaleY = containerScale
+                    transformOrigin = TransformOrigin.Center
                 }
                 .background(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -195,11 +192,6 @@ internal fun MorphArtworkLayer(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .matchParentSize()
-                    .graphicsLayer {
-                        scaleX = imageScale
-                        scaleY = imageScale
-                        transformOrigin = TransformOrigin.Center
-                    }
                     .then(blurModifier)
             )
             if (collapsedArtworkDimAlpha > 0.01f && imageRequest != null) {
@@ -264,4 +256,3 @@ internal fun ExpandedArtwork(
         }
     }
 }
-

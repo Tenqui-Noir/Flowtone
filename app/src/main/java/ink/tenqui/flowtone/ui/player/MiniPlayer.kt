@@ -343,7 +343,7 @@ fun MiniPlayer(
             }
             .then(gestureModifier)
     ) {
-        val playerShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        val playerShape = RoundedCornerShape(24.dp)
         val playerShadowElevation = lerpDp(0.dp, 18.dp, animationProgress)
         PlayerDragHandle(
             animationProgress = animationProgress,
@@ -375,7 +375,7 @@ fun MiniPlayer(
                     onExpandedChange(true)
                 }
         ) {
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
@@ -389,6 +389,7 @@ fun MiniPlayer(
                         }
                     )
             ) {
+                val playerWidth = maxWidth
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -409,31 +410,21 @@ fun MiniPlayer(
                         .matchParentSize()
                         .background(Color.Black.copy(alpha = lerpFloat(0.24f, 0.36f, animationProgress)))
                 )
-            }
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(currentHeight)
-                    .align(Alignment.TopCenter),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                val playerWidth = maxWidth
+                MorphArtworkLayer(
+                    imageRequest = coverImageRequest,
+                    progress = animationProgress,
+                    playerWidth = playerWidth,
+                    expandedArtworkSize = expandedArtworkSize,
+                    expandedArtworkTop = expandedArtworkTop,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(currentHeight)
                         .align(Alignment.TopCenter)
                 ) {
-                    MorphArtworkLayer(
-                        imageRequest = coverImageRequest,
-                        progress = animationProgress,
-                        playerWidth = playerWidth,
-                        collapsedHeight = collapsedHeight,
-                        expandedArtworkSize = expandedArtworkSize,
-                        expandedArtworkTop = expandedArtworkTop,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                    )
                     SharedSongInfo(
                         title = title,
                         artist = artist,
