@@ -186,28 +186,34 @@ internal fun MorphArtworkLayer(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            CrossfadeArtworkImage(
-                imageRequest = imageRequest,
-                contentDescription = "\u4e13\u8f91\u5c01\u9762",
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .then(blurModifier)
-            )
-            if (collapsedArtworkDimAlpha > 0.01f && imageRequest != null) {
-                Box(
+                    .then(blurModifier),
+                contentAlignment = Alignment.Center
+            ) {
+                CrossfadeArtworkImage(
+                    imageRequest = imageRequest,
+                    contentDescription = "\u4e13\u8f91\u5c01\u9762",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .matchParentSize()
-                        .background(Color.Black.copy(alpha = collapsedArtworkDimAlpha))
                 )
-            }
-            if (imageRequest == null) {
-                Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(42.dp)
-                )
+                if (collapsedArtworkDimAlpha > 0.01f && imageRequest != null) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(Color.Black.copy(alpha = collapsedArtworkDimAlpha))
+                    )
+                }
+                if (imageRequest == null) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(42.dp)
+                    )
+                }
             }
         }
     }
