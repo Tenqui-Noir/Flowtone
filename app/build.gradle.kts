@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -43,13 +41,16 @@ fun versionCodeFromName(versionName: String): Int {
     return major * 1_000_000 + minor * 10_000 + patch * 100 + build
 }
 
-val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = Properties()
-val hasReleaseKeystore = keystorePropertiesFile.exists()
-
-if (hasReleaseKeystore) {
-    keystoreProperties.load(keystorePropertiesFile.inputStream())
-}
+val releaseKeystoreFile = System.getenv("FLOWTONE_RELEASE_KEYSTORE_FILE")
+val releaseKeystorePassword = System.getenv("FLOWTONE_RELEASE_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("FLOWTONE_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("FLOWTONE_RELEASE_KEY_PASSWORD")
+val hasReleaseSigningConfig = listOf(
+    releaseKeystoreFile,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "ink.tenqui.flowtone"
@@ -70,19 +71,19 @@ android {
     }
 
     signingConfigs {
-        if (hasReleaseKeystore) {
+        if (hasReleaseSigningConfig) {
             create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(releaseKeystoreFile!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
     }
 
     buildTypes {
         release {
-            if (hasReleaseKeystore) {
+            if (hasReleaseSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
             }
 

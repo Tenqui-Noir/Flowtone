@@ -1,0 +1,159 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build signed Pre-release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Ensure Pre-release does not already exist
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "::error::Release ${GITHUB_REF_NAME} already exists. Refusing to overwrite or delete an existing Release."
+            exit 1
+          fi
+
+      - name: Check release secrets
+        shell: bash
+        env:
+          FLOWTONE_RELEASE_KEYSTORE_BASE64: ${{ secrets.FLOWTONE_RELEASE_KEYSTORE_BASE64 }}
+          FLOWTONE_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.FLOWTONE_RELEASE_KEYSTORE_PASSWORD }}
+          FLOWTONE_RELEASE_KEY_ALIAS: ${{ secrets.FLOWTONE_RELEASE_KEY_ALIAS }}
+          FLOWTONE_RELEASE_KEY_PASSWORD: ${{ secrets.FLOWTONE_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for name in \
+            FLOWTONE_RELEASE_KEYSTORE_BASE64 \
+            FLOWTONE_RELEASE_KEYSTORE_PASSWORD \
+            FLOWTONE_RELEASE_KEY_ALIAS \
+            FLOWTONE_RELEASE_KEY_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is missing or empty"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Decode release keystore
+        shell: bash
+        env:
+          FLOWTONE_RELEASE_KEYSTORE_BASE64: ${{ secrets.FLOWTONE_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          # The release keystore comes from GitHub Secrets and is written only to the runner temp directory.
+          printf '%s' "$FLOWTONE_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/flowtone-release.jks"
+          chmod 600 "$RUNNER_TEMP/flowtone-release.jks"
+
+      - name: Build signed release APK
+        shell: bash
+        env:
+          FLOWTONE_RELEASE_KEYSTORE_FILE: ${{ runner.temp }}/flowtone-release.jks
+          FLOWTONE_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.FLOWTONE_RELEASE_KEYSTORE_PASSWORD }}
+          FLOWTONE_RELEASE_KEY_ALIAS: ${{ secrets.FLOWTONE_RELEASE_KEY_ALIAS }}
+          FLOWTONE_RELEASE_KEY_PASSWORD: ${{ secrets.FLOWTONE_RELEASE_KEY_PASSWORD }}
+        run: ./gradlew clean assembleRelease
+
+      - name: Prepare and verify signed APK
+        id: signed_apk
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Release APK outputs:"
+          find app/build/outputs/apk/release -maxdepth 1 -type f -name "*.apk" -printf "%f %s bytes\n" | sort
+
+          signed_apk="$(
+            find app/build/outputs/apk/release \
+              -maxdepth 1 \
+              -type f \
+              -name "*.apk" \
+              ! -name "*unsigned*" \
+              | sort \
+              | head -n 1
+          )"
+
+          if [ -z "$signed_apk" ]; then
+            echo "::error::No signed release APK found. Unsigned APKs are not accepted for release."
+            exit 1
+          fi
+
+          apksigner="$(find "$ANDROID_HOME/build-tools" -path "*/apksigner" -type f | sort -V | tail -n 1)"
+          if [ -z "$apksigner" ]; then
+            echo "::error::apksigner was not found in Android SDK build-tools"
+            exit 1
+          fi
+
+          "$apksigner" verify --verbose "$signed_apk"
+
+          mkdir -p dist
+          final_apk="dist/Flowtone-${GITHUB_REF_NAME}-signed.apk"
+          cp "$signed_apk" "$final_apk"
+
+          echo "apk_path=$final_apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Flowtone-${{ github.ref_name }}-signed-apk
+          path: dist/Flowtone-${{ github.ref_name }}-signed.apk
+          if-no-files-found: error
+
+      - name: Create GitHub Pre-release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "::error::Release ${GITHUB_REF_NAME} already exists. Refusing to overwrite or delete an existing Release."
+            exit 1
+          fi
+
+          # This is a Pre-release, not a stable production Release.
+          # The Release asset intentionally uploads only the signed APK.
+          gh release create "${GITHUB_REF_NAME}" \
+            "dist/Flowtone-${GITHUB_REF_NAME}-signed.apk#Flowtone ${GITHUB_REF_NAME} signed APK" \
+            --title "Flowtone ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --prerelease \
+            --latest=false \
+            --verify-tag
