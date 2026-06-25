@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -41,10 +43,38 @@ fun versionCodeFromName(versionName: String): Int {
     return major * 1_000_000 + minor * 10_000 + patch * 100 + build
 }
 
-val releaseKeystoreFile = System.getenv("FLOWTONE_RELEASE_KEYSTORE_FILE")
-val releaseKeystorePassword = System.getenv("FLOWTONE_RELEASE_KEYSTORE_PASSWORD")
-val releaseKeyAlias = System.getenv("FLOWTONE_RELEASE_KEY_ALIAS")
-val releaseKeyPassword = System.getenv("FLOWTONE_RELEASE_KEY_PASSWORD")
+val localKeystoreProperties = Properties().apply {
+    val propertiesFile = rootProject.file("keystore.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use(::load)
+    }
+}
+
+fun localKeystoreProperty(name: String): String? {
+    return localKeystoreProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+}
+
+fun releaseSigningValue(environmentName: String, localName: String): String? {
+    return System.getenv(environmentName)?.takeIf { it.isNotBlank() }
+        ?: localKeystoreProperty(localName)
+}
+
+val releaseKeystoreFile = releaseSigningValue(
+    environmentName = "FLOWTONE_RELEASE_KEYSTORE_FILE",
+    localName = "storeFile"
+)
+val releaseKeystorePassword = releaseSigningValue(
+    environmentName = "FLOWTONE_RELEASE_KEYSTORE_PASSWORD",
+    localName = "storePassword"
+)
+val releaseKeyAlias = releaseSigningValue(
+    environmentName = "FLOWTONE_RELEASE_KEY_ALIAS",
+    localName = "keyAlias"
+)
+val releaseKeyPassword = releaseSigningValue(
+    environmentName = "FLOWTONE_RELEASE_KEY_PASSWORD",
+    localName = "keyPassword"
+)
 val hasReleaseSigningConfig = listOf(
     releaseKeystoreFile,
     releaseKeystorePassword,
