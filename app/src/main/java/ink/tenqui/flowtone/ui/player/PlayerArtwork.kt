@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -107,6 +108,9 @@ internal fun CrossfadeArtworkImage(
 internal fun MorphArtworkLayer(
     imageRequest: ImageRequest?,
     progress: Float,
+    currentHeight: Dp,
+    viewportHeight: Dp,
+    collapsedHeight: Dp,
     playerWidth: Dp,
     expandedArtworkSize: Dp,
     expandedArtworkTop: Dp,
@@ -114,13 +118,18 @@ internal fun MorphArtworkLayer(
 ) {
     val expandedX = (playerWidth - expandedArtworkSize) / 2f
     val artworkX = expandedX
-    val artworkY = expandedArtworkTop
     val artworkSize = expandedArtworkSize
+    val collapsedContainerScale = 2f
+    val collapsedAnchorFraction = 0.382f
+    val collapsedArtworkCenterY = collapsedHeight * 0.5f
+    val collapsedArtworkTop = collapsedArtworkCenterY -
+        artworkSize * (0.5f + (collapsedAnchorFraction - 0.5f) * collapsedContainerScale)
+    val artworkY = lerpDp(collapsedArtworkTop, expandedArtworkTop, progress)
     val blurRadius = lerpDp(16.dp, 0.dp, progress)
     val cornerRadius = lerpDp(24.dp, 28.dp, progress)
     val shadowPadding = 32.dp
     val shadowProgress = progress.coerceIn(0f, 1f)
-    val containerScale = lerpFloat(2f, 1f, progress)
+    val containerScale = lerpFloat(collapsedContainerScale, 1f, progress)
     val collapsedArtworkDimAlpha = lerpFloat(0.38f, 0f, progress)
     val coverShape = RoundedCornerShape(cornerRadius)
     val blurModifier = if (blurRadius > 0.5.dp) {
@@ -132,6 +141,10 @@ internal fun MorphArtworkLayer(
     Box(
         modifier = modifier
             .offset(x = artworkX - shadowPadding, y = artworkY - shadowPadding)
+            .wrapContentSize(
+                align = Alignment.TopStart,
+                unbounded = true
+            )
             .width(artworkSize + shadowPadding * 2)
             .height(artworkSize + shadowPadding * 2)
             .graphicsLayer {

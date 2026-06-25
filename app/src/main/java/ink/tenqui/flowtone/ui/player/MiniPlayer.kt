@@ -377,12 +377,12 @@ fun MiniPlayer(
         ) {
             BoxWithConstraints(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(currentHeight)
-                    .clip(playerShape)
-                    .then(
-                        if (hasArtworkBackground) {
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(currentHeight)
+                .clip(playerShape)
+                .then(
+                    if (hasArtworkBackground) {
                             Modifier
                         } else {
                             Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -413,6 +413,9 @@ fun MiniPlayer(
                 MorphArtworkLayer(
                     imageRequest = coverImageRequest,
                     progress = animationProgress,
+                    currentHeight = currentHeight,
+                    viewportHeight = currentHeight,
+                    collapsedHeight = collapsedHeight,
                     playerWidth = playerWidth,
                     expandedArtworkSize = expandedArtworkSize,
                     expandedArtworkTop = expandedArtworkTop,
