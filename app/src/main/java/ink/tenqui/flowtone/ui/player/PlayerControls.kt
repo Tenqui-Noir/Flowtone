@@ -63,9 +63,9 @@ internal fun SharedPlaybackControls(
     val collapsedLeft = screenWidth - collapsedControlsWidth - 30.dp
     val collapsedControlsY = (collapsedHeight - collapsedTouchSize) / 2f
     val currentTop = lerpDp(collapsedControlsY, expandedTop, progress)
-    val progressLeft = (screenWidth - progressWidth) / 2f
-    val favoriteCenterX = progressLeft + 24.dp
-    val orderCenterX = progressLeft + progressWidth - 24.dp
+    val progressWidthLeft = (screenWidth - progressWidth) / 2f
+    val favoriteCenterX = progressWidthLeft + 24.dp
+    val orderCenterX = progressWidthLeft + progressWidth - 24.dp
     val playPauseCenterX = screenWidth / 2f
     val previousCenterX = (favoriteCenterX + playPauseCenterX) / 2f
     val nextCenterX = (playPauseCenterX + orderCenterX) / 2f
@@ -175,7 +175,10 @@ internal fun SideButtonsOverlay(
         val favoriteEndX = progressLeft
         val favoriteStartX = favoriteEndX - sideButtonHorizontalOffset
         val favoriteX = lerpDp(favoriteStartX, favoriteEndX, enterProgress)
-        Box(
+        FavoriteButton(
+            liked = isCurrentSongLiked,
+            enabled = hasCurrentSong && enterProgress > 0.55f,
+            onClick = onToggleLiked,
             modifier = Modifier
                 .offset(x = favoriteX, y = buttonY)
                 .size(buttonSize)
@@ -183,21 +186,17 @@ internal fun SideButtonsOverlay(
                     scaleX = scale
                     scaleY = scale
                     alpha = buttonAlpha
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            FavoriteButton(
-                liked = isCurrentSongLiked,
-                enabled = hasCurrentSong && enterProgress > 0.55f,
-                onClick = onToggleLiked,
-                modifier = Modifier.size(buttonSize)
-            )
-        }
+                }
+        )
 
         val orderEndX = progressLeft + progressWidth - buttonSize
         val orderStartX = orderEndX + sideButtonHorizontalOffset
         val orderX = lerpDp(orderStartX, orderEndX, enterProgress)
-        Box(
+        PlaybackOrderButton(
+            mode = playbackOrderMode,
+            iconColor = iconColor,
+            enabled = hasCurrentSong && enterProgress > 0.55f,
+            onClick = onTogglePlaybackOrderMode,
             modifier = Modifier
                 .offset(x = orderX, y = buttonY)
                 .size(buttonSize)
@@ -205,17 +204,8 @@ internal fun SideButtonsOverlay(
                     scaleX = scale
                     scaleY = scale
                     alpha = buttonAlpha
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            PlaybackOrderButton(
-                mode = playbackOrderMode,
-                iconColor = iconColor,
-                enabled = hasCurrentSong && enterProgress > 0.55f,
-                onClick = onTogglePlaybackOrderMode,
-                modifier = Modifier.size(buttonSize)
-            )
-        }
+                }
+        )
     }
 }
 
@@ -241,9 +231,9 @@ internal fun FavoriteButton(
                 Icons.Outlined.FavoriteBorder
             },
             contentDescription = if (liked) {
-                "鍙栨秷鍠滄"
+                "\u5df2\u559c\u6b22"
             } else {
-                "鍠滄"
+                "\u6dfb\u52a0\u559c\u6b22"
             },
             tint = if (liked) {
                 Color(0xFFFF4D67)
@@ -269,9 +259,9 @@ internal fun PlaybackOrderButton(
         PlaybackOrderMode.Shuffle -> Icons.Rounded.Shuffle
     }
     val description = when (mode) {
-        PlaybackOrderMode.Sequence -> "顺序播放"
-        PlaybackOrderMode.RepeatOne -> "单曲循环"
-        PlaybackOrderMode.Shuffle -> "随机播放"
+        PlaybackOrderMode.Sequence -> "\u987a\u5e8f\u64ad\u653e"
+        PlaybackOrderMode.RepeatOne -> "\u5355\u66f2\u5faa\u73af"
+        PlaybackOrderMode.Shuffle -> "\u968f\u673a\u64ad\u653e"
     }
     TransparentControlButton(
         onClick = onClick,
@@ -311,4 +301,3 @@ internal fun TransparentControlButton(
         content()
     }
 }
-
