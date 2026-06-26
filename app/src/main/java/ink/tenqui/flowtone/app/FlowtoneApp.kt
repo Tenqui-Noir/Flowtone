@@ -14,13 +14,25 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.tappableElement
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -41,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ink.tenqui.flowtone.permissions.currentAudioPermission
@@ -52,6 +65,12 @@ import ink.tenqui.flowtone.viewmodel.MusicViewModel
 
 private const val MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS = 300
 private const val FLOWTONE_INSETS_TAG = "FlowtoneInsets"
+
+private enum class TopDestination {
+    Home,
+    Library,
+    Mine
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +90,9 @@ fun FlowtoneApp(
     }
     var miniPlayerExpanded by rememberSaveable {
         mutableStateOf(false)
+    }
+    var selectedTopDestination by rememberSaveable {
+        mutableStateOf(TopDestination.Library)
     }
     val hasCurrentSong = playerUiState.hasCurrentSong
     val backgroundBlurProgress by animateFloatAsState(
@@ -193,9 +215,13 @@ fun FlowtoneApp(
                         titleContentColor = MaterialTheme.colorScheme.onSurface
                     ),
                     title = {
-                        Text(text = "Flowtone")
+                        FlowtoneTopBarContent(
+                            selectedDestination = selectedTopDestination,
+                            onDestinationSelected = { selectedTopDestination = it },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     },
-                    expandedHeight = TopAppBarDefaults.TopAppBarExpandedHeight
+                    expandedHeight = 96.dp
                 )
             }
         ) { innerPadding ->
@@ -241,4 +267,109 @@ fun FlowtoneApp(
                 .padding(bottom = miniPlayerBottomProtection)
         )
     }
+}
+
+@Composable
+private fun FlowtoneTopBarContent(
+    selectedDestination: TopDestination,
+    onDestinationSelected: (TopDestination) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .height(76.dp)
+            .padding(top = 0.dp, end = 16.dp),
+        verticalArrangement = Arrangement.Top
+    ) {
+        Text(
+            text = "Flowtone",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(top = 0.dp)
+        )
+        TopDestinationButtons(
+            selectedDestination = selectedDestination,
+            onDestinationSelected = onDestinationSelected,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun TopDestinationButtons(
+    selectedDestination: TopDestination,
+    onDestinationSelected: (TopDestination) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val destinations = listOf(
+        TopDestination.Home,
+        TopDestination.Library,
+        TopDestination.Mine
+    )
+
+    Row(
+        modifier = modifier.height(48.dp),
+        horizontalArrangement = Arrangement.spacedBy(
+            space = 24.dp,
+            alignment = Alignment.CenterHorizontally
+        ),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        destinations.forEach { destination ->
+            val selected = destination == selectedDestination
+            val contentColor = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Box(
+                modifier = Modifier
+                    .width(56.dp)
+                    .height(48.dp)
+                    .clickable { onDestinationSelected(destination) }
+                    .padding(vertical = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selected) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = topDestinationIcon(destination),
+                            contentDescription = topDestinationLabel(destination),
+                            tint = contentColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = topDestinationLabel(destination),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = contentColor
+                        )
+                    }
+                } else {
+                    Icon(
+                        imageVector = topDestinationIcon(destination),
+                        contentDescription = topDestinationLabel(destination),
+                        tint = contentColor,
+                        modifier = Modifier.size(23.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun topDestinationIcon(destination: TopDestination) = when (destination) {
+    TopDestination.Home -> Icons.Rounded.Home
+    TopDestination.Library -> Icons.Rounded.LibraryMusic
+    TopDestination.Mine -> Icons.Rounded.Person
+}
+
+private fun topDestinationLabel(destination: TopDestination) = when (destination) {
+    TopDestination.Home -> "\u9996\u9875"
+    TopDestination.Library -> "\u66f2\u5e93"
+    TopDestination.Mine -> "\u6211\u7684"
 }
