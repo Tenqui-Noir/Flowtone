@@ -67,7 +67,8 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 8.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
+            contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             items(
                 items = uiState.songs,
