@@ -28,8 +28,19 @@ class AppPreferences(context: Context) {
             .apply()
     }
 
+    fun shouldHideSecondaryBackButton(): Boolean {
+        return prefs.getBoolean(HIDE_SECONDARY_BACK_BUTTON_KEY, false)
+    }
+
+    fun setHideSecondaryBackButton(hide: Boolean) {
+        prefs.edit()
+            .putBoolean(HIDE_SECONDARY_BACK_BUTTON_KEY, hide)
+            .apply()
+    }
+
     private companion object {
         const val DEFAULT_START_PAGE_KEY = "default_start_page"
+        const val HIDE_SECONDARY_BACK_BUTTON_KEY = "hide_secondary_back_button"
         const val HOME_VALUE = "home"
         const val LIBRARY_VALUE = "library"
         const val MINE_VALUE = "mine"

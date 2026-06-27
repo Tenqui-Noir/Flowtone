@@ -11,9 +11,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -49,12 +50,14 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,9 +74,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -82,14 +83,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ink.tenqui.flowtone.core.model.Song
 import ink.tenqui.flowtone.permissions.currentAudioPermission
 import ink.tenqui.flowtone.permissions.hasAudioPermission
+import ink.tenqui.flowtone.ui.components.StaggeredPageElement
 import ink.tenqui.flowtone.ui.library.LibraryScreen
 import ink.tenqui.flowtone.ui.library.LocalLibraryScreen
 import ink.tenqui.flowtone.ui.player.MiniPlayer
@@ -99,20 +98,16 @@ import ink.tenqui.flowtone.ui.screens.OpenSourceScreen
 import ink.tenqui.flowtone.viewmodel.MusicUiState
 import ink.tenqui.flowtone.viewmodel.MusicViewModel
 import kotlinx.coroutines.delay
-import kotlin.math.abs
 
 private const val MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS = 300
 private const val FLOWTONE_INSETS_TAG = "FlowtoneInsets"
 private val FlowtonePageEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
-private enum class SecondaryPage(
-    val title: String,
-    val secondaryTitle: String = title
-) {
+private enum class SecondaryPage(val title: String) {
     Settings("\u8bbe\u7f6e"),
     About("\u5173\u4e8e"),
     LocalLibrary("\u672c\u5730\u66f2\u5e93"),
-    OpenSource("\u5f00\u6e90\u7ec4\u4ef6", secondaryTitle = "\u5173\u4e8e")
+    OpenSource("\u5f00\u6e90\u7ec4\u4ef6")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -145,6 +140,9 @@ fun FlowtoneApp(
     }
     var secondaryPage by rememberSaveable {
         mutableStateOf<SecondaryPage?>(null)
+    }
+    var hideSecondaryBackButton by rememberSaveable {
+        mutableStateOf(appPreferences.shouldHideSecondaryBackButton())
     }
     val pagerState = rememberPagerState(
         initialPage = defaultStartPage.index,
@@ -261,7 +259,7 @@ fun FlowtoneApp(
         miniPlayerExpanded = false
     }
 
-    BackHandler(enabled = secondaryPage != null) {
+    val navigateBack: () -> Unit = {
         secondaryPage = when (secondaryPage) {
             SecondaryPage.OpenSource -> SecondaryPage.About
             SecondaryPage.Settings,
@@ -270,6 +268,7 @@ fun FlowtoneApp(
             null -> null
         }
     }
+    BackHandler(enabled = secondaryPage != null, onBack = navigateBack)
 
     LaunchedEffect(selectedTopLevelPage, secondaryPage) {
         contentScrollOffsetPx = 0f
@@ -324,7 +323,8 @@ fun FlowtoneApp(
                     secondaryProgress = secondaryProgress,
                     tertiaryProgress = tertiaryProgress,
                     backgroundAlpha = topBarBackgroundAlpha,
-                    onBack = { secondaryPage = null }
+                    hideBackButton = hideSecondaryBackButton,
+                    onBack = navigateBack
                 )
             }
         ) { innerPadding ->
@@ -397,6 +397,11 @@ fun FlowtoneApp(
                         SecondaryPage.Settings -> SettingsScreen(
                             appPreferences = appPreferences,
                             onBack = { secondaryPage = null },
+                            hideSecondaryBackButton = hideSecondaryBackButton,
+                            onHideSecondaryBackButtonChange = { hide ->
+                                hideSecondaryBackButton = hide
+                                appPreferences.setHideSecondaryBackButton(hide)
+                            },
                             elementModifier = ::elementModifier,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -469,52 +474,28 @@ private fun FlowtoneTopBar(
     secondaryProgress: Float,
     tertiaryProgress: Float,
     backgroundAlpha: Float,
+    hideBackButton: Boolean,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val inLocalLibrary = secondaryPage == SecondaryPage.LocalLibrary
-    var displayedSecondaryTitle by remember {
-        mutableStateOf(secondaryPage?.title.orEmpty())
+    val pathSegments = when (secondaryPage) {
+        SecondaryPage.Settings -> listOf(SecondaryPage.Settings.title)
+        SecondaryPage.About -> listOf(SecondaryPage.About.title)
+        SecondaryPage.LocalLibrary -> listOf(SecondaryPage.LocalLibrary.title)
+        SecondaryPage.OpenSource -> listOf(
+            SecondaryPage.About.title,
+            SecondaryPage.OpenSource.title
+        )
+        null -> emptyList()
     }
-    LaunchedEffect(secondaryPage) {
-        secondaryPage?.let { displayedSecondaryTitle = it.secondaryTitle }
-    }
-    val density = LocalDensity.current
-    val textMeasurer = rememberTextMeasurer()
-    val titleOffsetYPx = with(density) { -3.dp.toPx() }
-    val parentOffsetYPx = with(density) { -17.dp.toPx() }
-    val parentOffsetXPx = with(density) { 1.dp.toPx() }
-    val childRestingOffsetYPx = with(density) { 3.dp.toPx() }
-    val childHiddenOffsetYPx = with(density) { 48.dp.toPx() }
-    val pathGapPx = with(density) { 2.dp.toPx() }
-    val pathBaselineCorrectionPx = with(density) { 1.dp.toPx() }
-    val navigationShiftPx = with(density) { 40.dp.toPx() } *
-        if (inLocalLibrary) secondaryProgress else 0f
-    val parentWidthPx = textMeasurer.measure(
-        text = selectedTopLevelPage.title,
-        style = MaterialTheme.typography.titleLarge
-    ).size.width * 0.65f
-    val separatorWidthPx = textMeasurer.measure(
-        text = "/",
-        style = MaterialTheme.typography.labelLarge
-    ).size.width.toFloat()
-    val topPathOffsetYPx = titleOffsetYPx + parentOffsetYPx
-    val separatorTargetXPx = parentOffsetXPx + parentWidthPx + pathGapPx
-    val secondaryPathTargetXPx = separatorTargetXPx + separatorWidthPx + pathGapPx
-    val expandedSecondaryStyle = MaterialTheme.typography.headlineSmall
-    val compactSecondaryStyle = MaterialTheme.typography.labelLarge
-    val secondaryTitleStyle = expandedSecondaryStyle.copy(
-        fontSize = (
-            expandedSecondaryStyle.fontSize.value +
-                (compactSecondaryStyle.fontSize.value - expandedSecondaryStyle.fontSize.value) *
-                tertiaryProgress
-            ).sp,
-        lineHeight = (
-            expandedSecondaryStyle.lineHeight.value +
-                (compactSecondaryStyle.lineHeight.value - expandedSecondaryStyle.lineHeight.value) *
-                tertiaryProgress
-            ).sp
+    val showBackButton = secondaryPage != null && !hideBackButton
+    val backButtonProgress by animateFloatAsState(
+        targetValue = if (showBackButton) 1f else 0f,
+        animationSpec = tween(280, easing = FlowtonePageEasing),
+        label = "SecondaryBackButtonProgress"
     )
+    val density = LocalDensity.current
+    val navigationShiftPx = with(density) { 40.dp.toPx() } * backButtonProgress
 
     Box(
         modifier = modifier
@@ -529,12 +510,12 @@ private fun FlowtoneTopBar(
         contentAlignment = Alignment.CenterStart
     ) {
         AnimatedVisibility(
-            visible = inLocalLibrary,
+            visible = showBackButton,
             enter = fadeIn(tween(180, easing = FlowtonePageEasing)) +
-                slideInHorizontally(tween(260, easing = FlowtonePageEasing)) { -it },
+                slideInHorizontally(tween(260, easing = FlowtonePageEasing)) { -it * 2 },
             exit = fadeOut(tween(140, easing = FlowtonePageEasing)) +
-                slideOutHorizontally(tween(240, easing = FlowtonePageEasing)) { -it },
-            modifier = Modifier.offset(x = (-16).dp)
+                slideOutHorizontally(tween(260, easing = FlowtonePageEasing)) { -it * 2 },
+            modifier = Modifier.offset(x = (-8).dp)
         ) {
             IconButton(
                 onClick = onBack,
@@ -547,77 +528,13 @@ private fun FlowtoneTopBar(
                 )
             }
         }
-        ContinuousTopTitle(
+        FlowtonePathTitle(
             pagerState = pagerState,
-            parentPage = selectedTopLevelPage,
-            secondaryProgress = secondaryProgress,
-            parentOffsetXPx = parentOffsetXPx,
-            parentOffsetYPx = parentOffsetYPx,
-            modifier = Modifier.graphicsLayer {
-                translationX = navigationShiftPx
-                translationY = titleOffsetYPx
-            }
-        )
-        AnimatedVisibility(
-            visible = secondaryPage != null && !inLocalLibrary,
-            enter = fadeIn(
-                tween(durationMillis = 220, easing = FlowtonePageEasing)
-            ) + slideInVertically(
-                animationSpec = tween(300, easing = FlowtonePageEasing)
-            ) { it },
-            exit = fadeOut(
-                tween(durationMillis = 180, easing = FlowtonePageEasing)
-            ) + slideOutVertically(
-                animationSpec = tween(300, easing = FlowtonePageEasing)
-            ) { it },
-            modifier = Modifier.graphicsLayer {
-                translationX = separatorTargetXPx
-                translationY = topPathOffsetYPx + pathBaselineCorrectionPx
-            }
-        ) {
-            Text(
-                text = "/",
-                maxLines = 1,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Text(
-            text = displayedSecondaryTitle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = secondaryTitleStyle,
-            fontWeight = FontWeight.Medium,
-            color = lerp(
-                MaterialTheme.colorScheme.onSurface,
-                MaterialTheme.colorScheme.onSurfaceVariant,
-                tertiaryProgress
-            ),
-            modifier = Modifier.graphicsLayer {
-                transformOrigin = TransformOrigin(0f, 0.5f)
-                translationX = navigationShiftPx +
-                    secondaryPathTargetXPx * tertiaryProgress
-                val secondaryOffsetY = childHiddenOffsetYPx +
-                    (childRestingOffsetYPx - childHiddenOffsetYPx) * secondaryProgress
-                translationY = secondaryOffsetY +
-                    (topPathOffsetYPx + pathBaselineCorrectionPx -
-                        childRestingOffsetYPx) * tertiaryProgress
-                alpha = secondaryProgress
-            }
-        )
-        Text(
-            text = SecondaryPage.OpenSource.title,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.graphicsLayer {
-                translationY = childHiddenOffsetYPx +
-                    (childRestingOffsetYPx - childHiddenOffsetYPx) * tertiaryProgress
-                alpha = tertiaryProgress
-            }
+            rootPage = selectedTopLevelPage,
+            segments = pathSegments,
+            levelProgress = listOf(secondaryProgress, tertiaryProgress),
+            navigationShiftPx = navigationShiftPx,
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
@@ -651,6 +568,7 @@ private fun TopLevelPagerContent(
                 TopLevelPage.Library -> LibraryScreen(
                     songCount = uiState.songs.size,
                     onOpenLocalLibrary = onOpenLocalLibrary,
+                    visible = !secondaryOpen,
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -733,34 +651,9 @@ private fun MineMenuItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    AnimatedVisibility(
+    StaggeredPageElement(
         visible = visible,
-        enter = fadeIn(
-            tween(
-                durationMillis = 220,
-                delayMillis = 90 + animationIndex * 45,
-                easing = FlowtonePageEasing
-            )
-        ) + slideInVertically(
-            animationSpec = tween(
-                durationMillis = 240,
-                delayMillis = 90 + animationIndex * 45,
-                easing = FlowtonePageEasing
-            )
-        ) { it / 6 },
-        exit = fadeOut(
-            tween(
-                durationMillis = 180,
-                delayMillis = animationIndex * 45,
-                easing = FlowtonePageEasing
-            )
-        ) + slideOutVertically(
-            animationSpec = tween(
-                durationMillis = 240,
-                delayMillis = animationIndex * 45,
-                easing = FlowtonePageEasing
-            )
-        ) { -it / 6 },
+        animationIndex = animationIndex,
         modifier = modifier
     ) {
         Row(
@@ -786,12 +679,22 @@ private fun MineMenuItem(
 private fun SettingsScreen(
     appPreferences: AppPreferences,
     onBack: () -> Unit,
+    hideSecondaryBackButton: Boolean,
+    onHideSecondaryBackButtonChange: (Boolean) -> Unit,
     elementModifier: (Int) -> Modifier,
     modifier: Modifier = Modifier
 ) {
     var selectedStartPage by rememberSaveable {
         mutableStateOf(appPreferences.getDefaultStartPage())
     }
+    var startPageExpanded by rememberSaveable {
+        mutableStateOf(false)
+    }
+    val expandIconRotation by animateFloatAsState(
+        targetValue = if (startPageExpanded) 180f else 0f,
+        animationSpec = tween(280, easing = FlowtonePageEasing),
+        label = "StartPageExpandIconRotation"
+    )
     val pages = listOf(
         TopLevelPage.Home,
         TopLevelPage.Library,
@@ -821,44 +724,114 @@ private fun SettingsScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         Text(
-            text = "\u542f\u52a8\u65f6\u9ed8\u8ba4\u8fdb\u5165",
+            text = "\u5e94\u7528\u884c\u4e3a",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = elementModifier(0)
+            modifier = elementModifier(0).padding(bottom = 10.dp)
         )
-        Text(
-            text = "\u4e0b\u6b21\u6253\u5f00\u5e94\u7528\u65f6\u751f\u6548",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = elementModifier(1).padding(top = 4.dp, bottom = 12.dp)
-        )
-        pages.forEachIndexed { index, page ->
+        Column(
+            modifier = elementModifier(1)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+        ) {
             Row(
-                modifier = elementModifier(index + 2)
+                modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable {
-                        selectedStartPage = page
-                        appPreferences.setDefaultStartPage(page)
-                    }
-                    .padding(vertical = 8.dp),
+                    .clickable { startPageExpanded = !startPageExpanded }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                RadioButton(
-                    selected = selectedStartPage == page,
-                    onClick = {
-                        selectedStartPage = page
-                        appPreferences.setDefaultStartPage(page)
-                    }
-                )
-                Text(
-                    text = page.label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 8.dp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "\u542f\u52a8\u65f6\u9ed8\u8ba4\u8fdb\u5165",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "\u4e0b\u6b21\u6253\u5f00\u5e94\u7528\u65f6\u751f\u6548",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Rounded.ExpandMore,
+                    contentDescription = if (startPageExpanded) "\u6536\u8d77" else "\u5c55\u5f00",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { rotationZ = expandIconRotation }
                 )
             }
+            AnimatedVisibility(
+                visible = startPageExpanded,
+                enter = expandVertically(
+                    animationSpec = tween(300, easing = FlowtonePageEasing)
+                ) + fadeIn(tween(220, easing = FlowtonePageEasing)),
+                exit = shrinkVertically(
+                    animationSpec = tween(300, easing = FlowtonePageEasing)
+                ) + fadeOut(tween(180, easing = FlowtonePageEasing))
+            ) {
+                Column(modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
+                    pages.forEach { page ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    selectedStartPage = page
+                                    appPreferences.setDefaultStartPage(page)
+                                }
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedStartPage == page,
+                                onClick = {
+                                    selectedStartPage = page
+                                    appPreferences.setDefaultStartPage(page)
+                                }
+                            )
+                            Text(
+                                text = page.label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Row(
+            modifier = elementModifier(2)
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .clickable {
+                    onHideSecondaryBackButtonChange(!hideSecondaryBackButton)
+                }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "\u5173\u95ed\u5b50\u83dc\u5355\u8fd4\u56de\u6309\u94ae",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "\u53f3\u6ed1\u5c4f\u5e55\u5373\u53ef\u8fd4\u56de\u4e0a\u4e00\u7ea7",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Switch(
+                checked = hideSecondaryBackButton,
+                onCheckedChange = onHideSecondaryBackButtonChange
+            )
         }
     }
 }
@@ -905,114 +878,5 @@ private fun SwipePageHint(
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .padding(horizontal = 12.dp, vertical = 6.dp)
         )
-    }
-}
-
-@Composable
-private fun ContinuousTopTitle(
-    pagerState: PagerState,
-    parentPage: TopLevelPage,
-    secondaryProgress: Float,
-    parentOffsetXPx: Float,
-    parentOffsetYPx: Float,
-    modifier: Modifier = Modifier
-) {
-    val density = LocalDensity.current
-    val slideDistancePx = with(density) { 36.dp.toPx() }
-    val pagePosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
-
-    Box(
-        modifier = modifier.height(36.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        TopLevelPage.entries.forEach { page ->
-            val distance = page.index - pagePosition
-            val isParent = page == parentPage
-            val pageAlpha = (1f - abs(distance)).coerceIn(0f, 1f)
-            val scale = if (isParent) 1f - 0.35f * secondaryProgress else 1f
-            val titleColor = if (isParent) {
-                lerp(
-                    MaterialTheme.colorScheme.onSurface,
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-                    secondaryProgress
-                )
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            }
-
-            Text(
-                text = page.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
-                color = titleColor,
-                modifier = Modifier.graphicsLayer {
-                    transformOrigin = TransformOrigin(0f, 0.5f)
-                    translationX = distance * slideDistancePx +
-                        if (isParent) parentOffsetXPx * secondaryProgress else 0f
-                    translationY = if (isParent) parentOffsetYPx * secondaryProgress else 0f
-                    scaleX = scale
-                    scaleY = scale
-                    alpha = pageAlpha * if (isParent) 1f else 1f - secondaryProgress
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun AnimatedTopTitle(
-    page: TopLevelPage,
-    color: Color = MaterialTheme.colorScheme.onSurface,
-    modifier: Modifier = Modifier
-) {
-    val density = LocalDensity.current
-    val slideDistancePx = with(density) { 36.dp.roundToPx() }
-
-    AnimatedContent(
-        targetState = page,
-        transitionSpec = {
-            val direction = when {
-                targetState.index > initialState.index -> 1
-                targetState.index < initialState.index -> -1
-                else -> 0
-            }
-
-            if (direction == 0) {
-                fadeIn(tween(120)) togetherWith fadeOut(tween(120))
-            } else {
-                (
-                    slideInHorizontally(
-                        animationSpec = tween(
-                            durationMillis = 320,
-                            easing = FastOutSlowInEasing
-                        )
-                    ) { direction * slideDistancePx } + fadeIn(tween(220))
-                ) togetherWith (
-                    slideOutHorizontally(
-                        animationSpec = tween(
-                            durationMillis = 320,
-                            easing = FastOutSlowInEasing
-                        )
-                    ) { -direction * slideDistancePx } + fadeOut(tween(180))
-                )
-            }.using(SizeTransform(clip = false))
-        },
-        label = "TopBarTitleTransition"
-    ) { targetPage ->
-        Box(
-            modifier = modifier.height(36.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = targetPage.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
-                color = color
-            )
-        }
     }
 }

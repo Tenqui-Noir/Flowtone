@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import ink.tenqui.flowtone.core.model.Song
 import ink.tenqui.flowtone.ui.components.LibraryCollectionCard
 import ink.tenqui.flowtone.ui.components.SongListItem
+import ink.tenqui.flowtone.ui.components.StaggeredPageElement
 import ink.tenqui.flowtone.viewmodel.MusicUiState
 
 private val LibraryInfoCardHeight = 112.dp
@@ -31,6 +32,7 @@ private val LibraryInfoCardHeight = 112.dp
 fun LibraryScreen(
     songCount: Int,
     onOpenLocalLibrary: () -> Unit,
+    visible: Boolean,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -38,14 +40,20 @@ fun LibraryScreen(
             .fillMaxSize()
             .padding(horizontal = 20.dp, vertical = 8.dp)
     ) {
-        LibraryCollectionCard(
-            title = "\u672c\u5730\u66f2\u5e93",
-            subtitle = "$songCount \u9996\u6b4c\u66f2",
-            onClick = onOpenLocalLibrary,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(LibraryInfoCardHeight)
-        )
+        StaggeredPageElement(
+            visible = visible,
+            animationIndex = 0,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            LibraryCollectionCard(
+                title = "\u672c\u5730\u66f2\u5e93",
+                subtitle = "$songCount \u9996\u6b4c\u66f2",
+                onClick = onOpenLocalLibrary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LibraryInfoCardHeight)
+            )
+        }
     }
 }
 
