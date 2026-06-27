@@ -10,7 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -64,8 +65,10 @@ fun LocalLibraryScreen(
     permissionDenied: Boolean,
     onRequestPermission: () -> Unit,
     onSongClick: (Song) -> Unit,
+    itemModifier: (Int) -> Modifier = { Modifier },
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
     when {
         !uiState.hasPermission -> PermissionContent(
             permissionDenied = permissionDenied,
@@ -98,6 +101,7 @@ fun LocalLibraryScreen(
         )
 
         else -> LazyColumn(
+            state = listState,
             modifier = modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
@@ -105,14 +109,18 @@ fun LocalLibraryScreen(
             contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            items(
+            itemsIndexed(
                 items = uiState.songs,
-                key = { it.id }
-            ) { song ->
+                key = { _, song -> song.id }
+            ) { index, song ->
+                val visibleAnimationIndex = (
+                    index - listState.firstVisibleItemIndex
+                    ).coerceIn(0, 10)
                 SongListItem(
                     song = song,
                     isCurrentSong = currentSong?.id == song.id,
-                    onClick = onSongClick
+                    onClick = onSongClick,
+                    modifier = itemModifier(visibleAnimationIndex)
                 )
             }
         }

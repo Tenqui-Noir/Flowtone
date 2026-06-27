@@ -21,7 +21,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -88,6 +87,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ink.tenqui.flowtone.core.model.Song
 import ink.tenqui.flowtone.permissions.currentAudioPermission
 import ink.tenqui.flowtone.permissions.hasAudioPermission
+import ink.tenqui.flowtone.ui.components.FlowtoneMotion
 import ink.tenqui.flowtone.ui.components.StaggeredPageElement
 import ink.tenqui.flowtone.ui.library.LibraryScreen
 import ink.tenqui.flowtone.ui.library.LocalLibraryScreen
@@ -101,7 +101,7 @@ import kotlinx.coroutines.delay
 
 private const val MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS = 300
 private const val FLOWTONE_INSETS_TAG = "FlowtoneInsets"
-private val FlowtonePageEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+private val FlowtonePageEasing = FlowtoneMotion.Easing
 
 private enum class SecondaryPage(val title: String) {
     Settings("\u8bbe\u7f6e"),
@@ -152,12 +152,18 @@ fun FlowtoneApp(
     val secondaryOpen = secondaryPage != null
     val secondaryProgress by animateFloatAsState(
         targetValue = if (secondaryOpen) 1f else 0f,
-        animationSpec = tween(300, easing = FlowtonePageEasing),
+        animationSpec = tween(
+            FlowtoneMotion.DurationMillis,
+            easing = FlowtonePageEasing
+        ),
         label = "SecondaryPageProgress"
     )
     val tertiaryProgress by animateFloatAsState(
         targetValue = if (secondaryPage == SecondaryPage.OpenSource) 1f else 0f,
-        animationSpec = tween(300, easing = FlowtonePageEasing),
+        animationSpec = tween(
+            FlowtoneMotion.DurationMillis,
+            easing = FlowtonePageEasing
+        ),
         label = "TertiaryPageProgress"
     )
     val topBarRevealDistancePx = with(density) { 24.dp.toPx() }
@@ -365,34 +371,38 @@ fun FlowtoneApp(
                     },
                     label = "SecondaryContentTransition"
                 ) { page ->
-                    fun elementModifier(index: Int): Modifier = Modifier.animateEnterExit(
-                        enter = fadeIn(
-                            tween(
-                                durationMillis = 220,
-                                delayMillis = 90 + index * 45,
-                                easing = FlowtonePageEasing
-                            )
-                        ) + slideInVertically(
-                            animationSpec = tween(
-                                durationMillis = 240,
-                                delayMillis = 90 + index * 45,
-                                easing = FlowtonePageEasing
-                            )
-                        ) { it / 6 },
-                        exit = fadeOut(
-                            tween(
-                                durationMillis = 180,
-                                delayMillis = index * 45,
-                                easing = FlowtonePageEasing
-                            )
-                        ) + slideOutVertically(
-                            animationSpec = tween(
-                                durationMillis = 240,
-                                delayMillis = index * 45,
-                                easing = FlowtonePageEasing
-                            )
-                        ) { -it / 6 }
-                    )
+                    fun elementModifier(index: Int): Modifier {
+                        val delayMillis = FlowtoneMotion.staggerDelayMillis(index)
+                        val durationMillis = FlowtoneMotion.staggerDurationMillis(index)
+                        return Modifier.animateEnterExit(
+                            enter = fadeIn(
+                                tween(
+                                    durationMillis = durationMillis,
+                                    delayMillis = delayMillis,
+                                    easing = FlowtonePageEasing
+                                )
+                            ) + slideInVertically(
+                                animationSpec = tween(
+                                    durationMillis = durationMillis,
+                                    delayMillis = delayMillis,
+                                    easing = FlowtonePageEasing
+                                )
+                            ) { it / 6 },
+                            exit = fadeOut(
+                                tween(
+                                    durationMillis = durationMillis,
+                                    delayMillis = delayMillis,
+                                    easing = FlowtonePageEasing
+                                )
+                            ) + slideOutVertically(
+                                animationSpec = tween(
+                                    durationMillis = durationMillis,
+                                    delayMillis = delayMillis,
+                                    easing = FlowtonePageEasing
+                                )
+                            ) { -it / 6 }
+                        )
+                    }
                     when (page) {
                         SecondaryPage.Settings -> SettingsScreen(
                             appPreferences = appPreferences,
@@ -427,6 +437,7 @@ fun FlowtoneApp(
                                 permissionLauncher.launch(currentAudioPermission())
                             },
                             onSongClick = { song -> musicViewModel.playSong(song) },
+                            itemModifier = { index -> elementModifier(index + 1) },
                             modifier = elementModifier(0)
                                 .fillMaxSize()
                                 .rightSwipeToGoBack { secondaryPage = null }
