@@ -88,6 +88,7 @@ import ink.tenqui.flowtone.core.model.Song
 import ink.tenqui.flowtone.permissions.currentAudioPermission
 import ink.tenqui.flowtone.permissions.hasAudioPermission
 import ink.tenqui.flowtone.ui.components.FlowtoneMotion
+import ink.tenqui.flowtone.ui.components.OptionGroup
 import ink.tenqui.flowtone.ui.components.StaggeredPageElement
 import ink.tenqui.flowtone.ui.library.LibraryScreen
 import ink.tenqui.flowtone.ui.library.LocalLibraryScreen
@@ -403,6 +404,46 @@ fun FlowtoneApp(
                             ) { -it / 6 }
                         )
                     }
+                    fun fadingContainerModifier(): Modifier = Modifier.animateEnterExit(
+                        enter = fadeIn(
+                            tween(
+                                durationMillis = FlowtoneMotion.DurationMillis,
+                                easing = FlowtonePageEasing
+                            )
+                        ),
+                        exit = fadeOut(
+                            tween(
+                                durationMillis = FlowtoneMotion.DurationMillis,
+                                easing = FlowtonePageEasing
+                            )
+                        )
+                    )
+                    fun songItemModifier(index: Int): Modifier {
+                        val delayMillis = FlowtoneMotion.staggerDelayMillis(index)
+                        val durationMillis = FlowtoneMotion.staggerDurationMillis(index)
+                        return Modifier.animateEnterExit(
+                            enter = fadeIn(
+                                tween(
+                                    durationMillis = durationMillis,
+                                    delayMillis = delayMillis,
+                                    easing = FlowtonePageEasing
+                                )
+                            ) + slideInVertically(
+                                animationSpec = tween(
+                                    durationMillis = durationMillis,
+                                    delayMillis = delayMillis,
+                                    easing = FlowtonePageEasing
+                                )
+                            ) { it / 6 },
+                            exit = fadeOut(
+                                tween(
+                                    durationMillis = durationMillis,
+                                    delayMillis = delayMillis,
+                                    easing = FlowtonePageEasing
+                                )
+                            )
+                        )
+                    }
                     when (page) {
                         SecondaryPage.Settings -> SettingsScreen(
                             appPreferences = appPreferences,
@@ -437,8 +478,8 @@ fun FlowtoneApp(
                                 permissionLauncher.launch(currentAudioPermission())
                             },
                             onSongClick = { song -> musicViewModel.playSong(song) },
-                            itemModifier = { index -> elementModifier(index + 1) },
-                            modifier = elementModifier(0)
+                            itemModifier = ::songItemModifier,
+                            modifier = fadingContainerModifier()
                                 .fillMaxSize()
                                 .rightSwipeToGoBack { secondaryPage = null }
                         )
@@ -734,88 +775,85 @@ private fun SettingsScreen(
             }
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        Text(
-            text = "\u5e94\u7528\u884c\u4e3a",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = elementModifier(0).padding(bottom = 10.dp)
-        )
-        Column(
-            modifier = elementModifier(1)
+        OptionGroup(
+            title = "\u5e94\u7528\u884c\u4e3a",
+            modifier = elementModifier(0)
+        ) {
+            Column(
+                modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { startPageExpanded = !startPageExpanded }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "\u542f\u52a8\u65f6\u9ed8\u8ba4\u8fdb\u5165",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "\u4e0b\u6b21\u6253\u5f00\u5e94\u7528\u65f6\u751f\u6548",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { startPageExpanded = !startPageExpanded }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "\u542f\u52a8\u65f6\u9ed8\u8ba4\u8fdb\u5165",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "\u4e0b\u6b21\u6253\u5f00\u5e94\u7528\u65f6\u751f\u6548",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.ExpandMore,
+                        contentDescription = if (startPageExpanded) "\u6536\u8d77" else "\u5c55\u5f00",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.graphicsLayer { rotationZ = expandIconRotation }
                     )
                 }
-                Icon(
-                    imageVector = Icons.Rounded.ExpandMore,
-                    contentDescription = if (startPageExpanded) "\u6536\u8d77" else "\u5c55\u5f00",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.graphicsLayer { rotationZ = expandIconRotation }
-                )
-            }
-            AnimatedVisibility(
-                visible = startPageExpanded,
-                enter = expandVertically(
-                    animationSpec = tween(300, easing = FlowtonePageEasing)
-                ) + fadeIn(tween(220, easing = FlowtonePageEasing)),
-                exit = shrinkVertically(
-                    animationSpec = tween(300, easing = FlowtonePageEasing)
-                ) + fadeOut(tween(180, easing = FlowtonePageEasing))
-            ) {
-                Column(modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
-                    pages.forEach { page ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    selectedStartPage = page
-                                    appPreferences.setDefaultStartPage(page)
-                                }
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedStartPage == page,
-                                onClick = {
-                                    selectedStartPage = page
-                                    appPreferences.setDefaultStartPage(page)
-                                }
-                            )
-                            Text(
-                                text = page.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
+                AnimatedVisibility(
+                    visible = startPageExpanded,
+                    enter = expandVertically(
+                        animationSpec = tween(300, easing = FlowtonePageEasing)
+                    ) + fadeIn(tween(220, easing = FlowtonePageEasing)),
+                    exit = shrinkVertically(
+                        animationSpec = tween(300, easing = FlowtonePageEasing)
+                    ) + fadeOut(tween(180, easing = FlowtonePageEasing))
+                ) {
+                    Column(modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
+                        pages.forEach { page ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        selectedStartPage = page
+                                        appPreferences.setDefaultStartPage(page)
+                                    }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedStartPage == page,
+                                    onClick = {
+                                        selectedStartPage = page
+                                        appPreferences.setDefaultStartPage(page)
+                                    }
+                                )
+                                Text(
+                                    text = page.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-        Row(
-            modifier = elementModifier(2)
+            Row(
+                modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp)
                 .clip(RoundedCornerShape(16.dp))
@@ -839,10 +877,11 @@ private fun SettingsScreen(
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
-            Switch(
-                checked = hideSecondaryBackButton,
-                onCheckedChange = onHideSecondaryBackButtonChange
-            )
+                Switch(
+                    checked = hideSecondaryBackButton,
+                    onCheckedChange = onHideSecondaryBackButtonChange
+                )
+            }
         }
     }
 }
