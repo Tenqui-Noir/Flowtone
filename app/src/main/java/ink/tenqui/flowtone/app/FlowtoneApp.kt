@@ -27,7 +27,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -76,7 +75,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -93,6 +91,7 @@ import ink.tenqui.flowtone.ui.components.FlowtoneMotion
 import ink.tenqui.flowtone.ui.components.OptionGroup
 import ink.tenqui.flowtone.ui.components.StaggeredPageElement
 import ink.tenqui.flowtone.ui.components.ThemeModeSelector
+import ink.tenqui.flowtone.ui.components.rightSwipeBackGesture
 import ink.tenqui.flowtone.ui.components.staggeredPageElementModifier
 import ink.tenqui.flowtone.ui.library.LibraryScreen
 import ink.tenqui.flowtone.ui.library.LocalLibraryScreen
@@ -498,7 +497,7 @@ fun FlowtoneApp(
                             itemModifier = ::songItemModifier,
                             modifier = fadingContainerModifier()
                                 .fillMaxSize()
-                                .rightSwipeToGoBack { secondaryPage = null }
+                                .rightSwipeBackGesture { secondaryPage = null }
                         )
 
                         null -> Box(modifier = Modifier.fillMaxSize())
@@ -784,23 +783,7 @@ private fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(onBack) {
-                var horizontalDrag = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { horizontalDrag = 0f },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        horizontalDrag = (horizontalDrag + dragAmount).coerceAtLeast(0f)
-                    },
-                    onDragEnd = {
-                        if (horizontalDrag >= 72.dp.toPx()) {
-                            onBack()
-                        }
-                        horizontalDrag = 0f
-                    },
-                    onDragCancel = { horizontalDrag = 0f }
-                )
-            }
+            .rightSwipeBackGesture(onBack)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
@@ -952,24 +935,6 @@ private fun SettingsScreen(
             }
         }
     }
-}
-
-private fun Modifier.rightSwipeToGoBack(onBack: () -> Unit): Modifier = pointerInput(onBack) {
-    var horizontalDrag = 0f
-    detectHorizontalDragGestures(
-        onDragStart = { horizontalDrag = 0f },
-        onHorizontalDrag = { change, dragAmount ->
-            change.consume()
-            horizontalDrag = (horizontalDrag + dragAmount).coerceAtLeast(0f)
-        },
-        onDragEnd = {
-            if (horizontalDrag >= 72.dp.toPx()) {
-                onBack()
-            }
-            horizontalDrag = 0f
-        },
-        onDragCancel = { horizontalDrag = 0f }
-    )
 }
 
 @Composable
