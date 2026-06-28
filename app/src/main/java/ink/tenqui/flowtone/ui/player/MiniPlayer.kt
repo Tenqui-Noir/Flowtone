@@ -44,6 +44,7 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.request.crossfade
 import coil3.toBitmap
+import ink.tenqui.flowtone.core.model.SourceType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -72,6 +73,7 @@ fun MiniPlayer(
     val artist = currentSong?.artist.orEmpty()
     var collapsedMetadataSwitchDirection by remember { mutableStateOf(1) }
     val artworkUri = playerUiState.artworkUri
+    val useLocalArtworkLoading = currentSong?.sourceType == SourceType.Local
     val durationMs = playerUiState.durationMs
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -207,7 +209,9 @@ fun MiniPlayer(
         mutableStateOf<List<Color>?>(null)
     }
     LaunchedEffect(currentSong?.id, artworkUri, fallbackSeedColor, isDarkTheme) {
-        extractedCloudColors = null
+        if (!useLocalArtworkLoading || artworkUri == null) {
+            extractedCloudColors = null
+        }
         Log.d(
             FLOWTONE_CLOUD_COLORS_TAG,
             "start songId=${currentSong?.id}, song=${title}, artworkUri=$artworkUri, " +
@@ -462,6 +466,7 @@ fun MiniPlayer(
                 BlurredArtworkBackground(
                     imageRequest = backgroundImageRequest,
                     alpha = lerpFloat(0.78f, 0f, animationProgress),
+                    waitForArtworkLoad = useLocalArtworkLoading,
                     modifier = Modifier.matchParentSize()
                 )
                 CrossfadeFlowCloudBackground(
@@ -477,6 +482,7 @@ fun MiniPlayer(
                 )
                 MorphArtworkLayer(
                     imageRequest = coverImageRequest,
+                    waitForArtworkLoad = useLocalArtworkLoading,
                     progress = artworkAnimationProgress,
                     scaleProgress = artworkScaleProgress,
                     currentHeight = currentHeight,

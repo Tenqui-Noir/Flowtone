@@ -37,11 +37,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.imageLoader
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 
 @Composable
 internal fun CrossfadeArtworkImage(
@@ -49,15 +52,30 @@ internal fun CrossfadeArtworkImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    alpha: Float = 1f
+    alpha: Float = 1f,
+    waitForImageLoad: Boolean = false
 ) {
+    val context = LocalContext.current
     var previousImageRequest by remember { mutableStateOf<ImageRequest?>(null) }
-    var displayedImageRequest by remember { mutableStateOf(imageRequest) }
+    var displayedImageRequest by remember {
+        mutableStateOf(if (waitForImageLoad) null else imageRequest)
+    }
     val crossfadeProgress = remember { Animatable(1f) }
 
-    LaunchedEffect(imageRequest) {
+    LaunchedEffect(imageRequest, waitForImageLoad) {
         if (imageRequest == displayedImageRequest) {
             return@LaunchedEffect
+        }
+
+        if (waitForImageLoad && imageRequest != null) {
+            val result = context.imageLoader.execute(imageRequest)
+            if (result !is SuccessResult) {
+                previousImageRequest = displayedImageRequest
+                displayedImageRequest = null
+                crossfadeProgress.snapTo(1f)
+                previousImageRequest = null
+                return@LaunchedEffect
+            }
         }
 
         previousImageRequest = displayedImageRequest
@@ -107,6 +125,7 @@ internal fun CrossfadeArtworkImage(
 @Composable
 internal fun MorphArtworkLayer(
     imageRequest: ImageRequest?,
+    waitForArtworkLoad: Boolean,
     progress: Float,
     scaleProgress: Float,
     currentHeight: Dp,
@@ -210,6 +229,7 @@ internal fun MorphArtworkLayer(
                     imageRequest = imageRequest,
                     contentDescription = "\u4e13\u8f91\u5c01\u9762",
                     contentScale = ContentScale.Crop,
+                    waitForImageLoad = waitForArtworkLoad,
                     modifier = Modifier
                         .matchParentSize()
                 )

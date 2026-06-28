@@ -245,6 +245,7 @@ private const val FLOW_CLOUD_STOP_DURATION_MS = 300
 internal fun BlurredArtworkBackground(
     imageRequest: ImageRequest?,
     alpha: Float,
+    waitForArtworkLoad: Boolean,
     modifier: Modifier = Modifier
 ) {
     if (alpha <= 0.01f) {
@@ -264,6 +265,7 @@ internal fun BlurredArtworkBackground(
             imageRequest = imageRequest,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            waitForImageLoad = waitForArtworkLoad,
             modifier = Modifier.fillMaxSize()
         )
     }
