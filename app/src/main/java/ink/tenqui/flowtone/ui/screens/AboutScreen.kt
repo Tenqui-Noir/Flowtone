@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,13 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ink.tenqui.flowtone.R
 import ink.tenqui.flowtone.ui.components.OptionGroup
+import ink.tenqui.flowtone.ui.components.rightSwipeBackGesture
 
 private const val GITHUB_URL = "https://github.com/FlowtoneApp/Flowtone"
 private const val GPL_URL = "https://opensource.org/license/gpl-3-0"
@@ -61,7 +60,7 @@ fun AboutScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .secondaryBackGesture(onBack)
+            .rightSwipeBackGesture(onBack)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
@@ -192,46 +191,6 @@ fun AboutScreen(
             }
         }
     }
-}
-
-@Composable
-fun OpenSourceScreen(
-    onBack: () -> Unit,
-    elementModifier: (Int) -> Modifier,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .secondaryBackGesture(onBack)
-            .padding(24.dp),
-        contentAlignment = Alignment.TopStart
-    ) {
-        Text(
-            text = "\u5f00\u6e90\u7ec4\u4ef6\u5360\u4f4d",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = elementModifier(0)
-        )
-    }
-}
-
-private fun Modifier.secondaryBackGesture(onBack: () -> Unit): Modifier = pointerInput(onBack) {
-    var horizontalDrag = 0f
-    detectHorizontalDragGestures(
-        onDragStart = { horizontalDrag = 0f },
-        onHorizontalDrag = { change, dragAmount ->
-            change.consume()
-            horizontalDrag = (horizontalDrag + dragAmount).coerceAtLeast(0f)
-        },
-        onDragEnd = {
-            if (horizontalDrag >= 72.dp.toPx()) {
-                onBack()
-            }
-            horizontalDrag = 0f
-        },
-        onDragCancel = { horizontalDrag = 0f }
-    )
 }
 
 private fun android.content.Context.openUrl(url: String) {

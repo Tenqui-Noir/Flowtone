@@ -1,5 +1,7 @@
 package ink.tenqui.flowtone.app
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.PagerState
@@ -20,6 +22,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ink.tenqui.flowtone.ui.components.FlowtoneMotion
 import kotlin.math.abs
 
 @Composable
@@ -27,7 +30,6 @@ internal fun FlowtonePathTitle(
     pagerState: PagerState,
     rootPage: TopLevelPage,
     segments: List<String>,
-    levelProgress: List<Float>,
     navigationShiftPx: Float,
     modifier: Modifier = Modifier
 ) {
@@ -40,6 +42,19 @@ internal fun FlowtonePathTitle(
                 retainedSegments += title
             }
         }
+    }
+
+    val levelProgress = mutableListOf<Float>()
+    retainedSegments.forEachIndexed { index, _ ->
+        val progress = animateFloatAsState(
+            targetValue = if (index < segments.size) 1f else 0f,
+            animationSpec = tween(
+                durationMillis = FlowtoneMotion.DurationMillis,
+                easing = FlowtoneMotion.Easing
+            ),
+            label = "PathLevelProgress$index"
+        ).value
+        levelProgress += progress
     }
 
     val density = LocalDensity.current
@@ -57,6 +72,7 @@ internal fun FlowtonePathTitle(
     val childHiddenOffsetYPx = with(density) { 48.dp.toPx() }
     val pathBaselineCorrectionPx = with(density) { 1.dp.toPx() }
     val pathGapPx = with(density) { 2.dp.toPx() }
+    val separatorEnterDistancePx = with(density) { 16.dp.toPx() }
     val ancestorYPx = titleBaseOffsetYPx + ancestorOffsetYPx + pathBaselineCorrectionPx
     val pagePosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val rootCompactWidthPx = textMeasurer.measure(
@@ -122,6 +138,7 @@ internal fun FlowtonePathTitle(
         retainedSegments.forEachIndexed { index, title ->
             val ownProgress = levelProgress.getOrElse(index) { 0f }
             val promotionProgress = levelProgress.getOrElse(index + 1) { 0f }
+            val entering = index < segments.size
             val childOffsetY = childHiddenOffsetYPx +
                 (childRestingOffsetYPx - childHiddenOffsetYPx) * ownProgress
             val segmentStyle = interpolateTextStyle(
@@ -129,6 +146,45 @@ internal fun FlowtonePathTitle(
                 compactStyle,
                 promotionProgress
             )
+            val parentBoundSeparatorX: Float
+            val parentBoundSeparatorY: Float
+            if (index == 0) {
+                val parentWidth = textMeasurer.measure(
+                    text = rootPage.title,
+                    style = rootStyle
+                ).size.width.toFloat()
+                parentBoundSeparatorX = navigationShiftPx +
+                    rootOpticalOffsetXPx * rootProgress +
+                    parentWidth +
+                    pathGapPx
+                parentBoundSeparatorY = titleBaseOffsetYPx +
+                    ancestorOffsetYPx * rootProgress +
+                    pathBaselineCorrectionPx
+            } else {
+                val parentOwnProgress = levelProgress.getOrElse(index - 1) { 0f }
+                val parentStyle = interpolateTextStyle(
+                    expandedChildStyle,
+                    compactStyle,
+                    ownProgress
+                )
+                val parentWidth = textMeasurer.measure(
+                    text = retainedSegments[index - 1],
+                    style = parentStyle
+                ).size.width.toFloat()
+                val parentX = navigationShiftPx +
+                    (segmentAncestorTargetX[index - 1] - navigationShiftPx) * ownProgress
+                val parentChildOffsetY = childHiddenOffsetYPx +
+                    (childRestingOffsetYPx - childHiddenOffsetYPx) * parentOwnProgress
+                val parentY = parentChildOffsetY +
+                    (ancestorYPx - childRestingOffsetYPx) * ownProgress
+                parentBoundSeparatorX = parentX + parentWidth + pathGapPx
+                parentBoundSeparatorY = parentY
+            }
+            val separatorX = if (entering) {
+                parentBoundSeparatorX - separatorEnterDistancePx * (1f - ownProgress)
+            } else {
+                parentBoundSeparatorX
+            }
             Text(
                 text = "/",
                 maxLines = 1,
@@ -136,10 +192,9 @@ internal fun FlowtonePathTitle(
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.graphicsLayer {
-                    translationX = separatorTargetX[index]
-                    translationY = childHiddenOffsetYPx +
-                        (ancestorYPx - childHiddenOffsetYPx) * promotionProgress
-                    alpha = promotionProgress
+                    translationX = separatorX
+                    translationY = parentBoundSeparatorY
+                    alpha = ownProgress
                 }
             )
             Text(

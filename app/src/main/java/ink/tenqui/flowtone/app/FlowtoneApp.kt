@@ -90,6 +90,7 @@ import ink.tenqui.flowtone.permissions.hasAudioPermission
 import ink.tenqui.flowtone.ui.components.FlowtoneMotion
 import ink.tenqui.flowtone.ui.components.OptionGroup
 import ink.tenqui.flowtone.ui.components.StaggeredPageElement
+import ink.tenqui.flowtone.ui.components.staggeredPageElementModifier
 import ink.tenqui.flowtone.ui.library.LibraryScreen
 import ink.tenqui.flowtone.ui.library.LocalLibraryScreen
 import ink.tenqui.flowtone.ui.player.MiniPlayer
@@ -142,6 +143,12 @@ fun FlowtoneApp(
     var secondaryPage by rememberSaveable {
         mutableStateOf<SecondaryPage?>(null)
     }
+    var openSourceBackAction by remember {
+        mutableStateOf<(() -> Unit)?>(null)
+    }
+    var openSourcePathSegments by remember {
+        mutableStateOf(emptyList<String>())
+    }
     var hideSecondaryBackButton by rememberSaveable {
         mutableStateOf(appPreferences.shouldHideSecondaryBackButton())
     }
@@ -151,22 +158,6 @@ fun FlowtoneApp(
     )
     val selectedTopLevelPage = TopLevelPage.entries[pagerState.currentPage]
     val secondaryOpen = secondaryPage != null
-    val secondaryProgress by animateFloatAsState(
-        targetValue = if (secondaryOpen) 1f else 0f,
-        animationSpec = tween(
-            FlowtoneMotion.DurationMillis,
-            easing = FlowtonePageEasing
-        ),
-        label = "SecondaryPageProgress"
-    )
-    val tertiaryProgress by animateFloatAsState(
-        targetValue = if (secondaryPage == SecondaryPage.OpenSource) 1f else 0f,
-        animationSpec = tween(
-            FlowtoneMotion.DurationMillis,
-            easing = FlowtonePageEasing
-        ),
-        label = "TertiaryPageProgress"
-    )
     val topBarRevealDistancePx = with(density) { 24.dp.toPx() }
     var contentScrollOffsetPx by remember {
         mutableStateOf(0f)
@@ -267,12 +258,21 @@ fun FlowtoneApp(
     }
 
     val navigateBack: () -> Unit = {
-        secondaryPage = when (secondaryPage) {
-            SecondaryPage.OpenSource -> SecondaryPage.About
-            SecondaryPage.Settings,
-            SecondaryPage.About,
-            SecondaryPage.LocalLibrary -> null
-            null -> null
+        if (secondaryPage == SecondaryPage.OpenSource) {
+            val nestedBackAction = openSourceBackAction
+            if (nestedBackAction != null) {
+                nestedBackAction()
+            } else {
+                secondaryPage = SecondaryPage.About
+            }
+        } else {
+            secondaryPage = when (secondaryPage) {
+                SecondaryPage.Settings,
+                SecondaryPage.About,
+                SecondaryPage.LocalLibrary -> null
+                SecondaryPage.OpenSource -> SecondaryPage.About
+                null -> null
+            }
         }
     }
     BackHandler(enabled = secondaryPage != null, onBack = navigateBack)
@@ -327,8 +327,7 @@ fun FlowtoneApp(
                     selectedTopLevelPage = selectedTopLevelPage,
                     pagerState = pagerState,
                     secondaryPage = secondaryPage,
-                    secondaryProgress = secondaryProgress,
-                    tertiaryProgress = tertiaryProgress,
+                    additionalPathSegments = openSourcePathSegments,
                     backgroundAlpha = topBarBackgroundAlpha,
                     hideBackButton = hideSecondaryBackButton,
                     onBack = navigateBack
@@ -373,36 +372,7 @@ fun FlowtoneApp(
                     label = "SecondaryContentTransition"
                 ) { page ->
                     fun elementModifier(index: Int): Modifier {
-                        val delayMillis = FlowtoneMotion.staggerDelayMillis(index)
-                        val durationMillis = FlowtoneMotion.staggerDurationMillis(index)
-                        return Modifier.animateEnterExit(
-                            enter = fadeIn(
-                                tween(
-                                    durationMillis = durationMillis,
-                                    delayMillis = delayMillis,
-                                    easing = FlowtonePageEasing
-                                )
-                            ) + slideInVertically(
-                                animationSpec = tween(
-                                    durationMillis = durationMillis,
-                                    delayMillis = delayMillis,
-                                    easing = FlowtonePageEasing
-                                )
-                            ) { it / 6 },
-                            exit = fadeOut(
-                                tween(
-                                    durationMillis = durationMillis,
-                                    delayMillis = delayMillis,
-                                    easing = FlowtonePageEasing
-                                )
-                            ) + slideOutVertically(
-                                animationSpec = tween(
-                                    durationMillis = durationMillis,
-                                    delayMillis = delayMillis,
-                                    easing = FlowtonePageEasing
-                                )
-                            ) { -it / 6 }
-                        )
+                        return staggeredPageElementModifier(index)
                     }
                     fun fadingContainerModifier(): Modifier = Modifier.animateEnterExit(
                         enter = fadeIn(
@@ -466,6 +436,12 @@ fun FlowtoneApp(
 
                         SecondaryPage.OpenSource -> OpenSourceScreen(
                             onBack = { secondaryPage = SecondaryPage.About },
+                            onBackActionChange = { action ->
+                                openSourceBackAction = action
+                            },
+                            onPathSegmentsChange = { segments ->
+                                openSourcePathSegments = segments
+                            },
                             elementModifier = ::elementModifier,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -523,8 +499,7 @@ private fun FlowtoneTopBar(
     selectedTopLevelPage: TopLevelPage,
     pagerState: PagerState,
     secondaryPage: SecondaryPage?,
-    secondaryProgress: Float,
-    tertiaryProgress: Float,
+    additionalPathSegments: List<String>,
     backgroundAlpha: Float,
     hideBackButton: Boolean,
     onBack: () -> Unit,
@@ -537,7 +512,7 @@ private fun FlowtoneTopBar(
         SecondaryPage.OpenSource -> listOf(
             SecondaryPage.About.title,
             SecondaryPage.OpenSource.title
-        )
+        ) + additionalPathSegments
         null -> emptyList()
     }
     val showBackButton = secondaryPage != null && !hideBackButton
@@ -584,7 +559,6 @@ private fun FlowtoneTopBar(
             pagerState = pagerState,
             rootPage = selectedTopLevelPage,
             segments = pathSegments,
-            levelProgress = listOf(secondaryProgress, tertiaryProgress),
             navigationShiftPx = navigationShiftPx,
             modifier = Modifier.fillMaxSize()
         )
