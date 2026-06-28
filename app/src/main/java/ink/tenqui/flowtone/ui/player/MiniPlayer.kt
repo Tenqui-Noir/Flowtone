@@ -467,6 +467,7 @@ fun MiniPlayer(
                 CrossfadeFlowCloudBackground(
                     colors = cloudColors,
                     progress = animationProgress,
+                    isPlaying = playerUiState.isPlaying,
                     modifier = Modifier.matchParentSize()
                 )
                 Box(

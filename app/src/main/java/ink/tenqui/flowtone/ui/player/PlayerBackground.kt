@@ -2,11 +2,6 @@ package ink.tenqui.flowtone.ui.player
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -15,9 +10,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
@@ -30,11 +28,14 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 
 @Composable
 internal fun FlowCloudBackground(
     colors: List<Color>,
     progress: Float,
+    isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
     val cloudColors = if (colors.size >= 3) {
@@ -46,43 +47,37 @@ internal fun FlowCloudBackground(
             MaterialTheme.colorScheme.tertiaryContainer
         )
     }
-    val infiniteTransition = rememberInfiniteTransition(label = "FlowCloudDrift")
-    val blob1Drift by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "FlowCloudBlob1Drift"
-    )
-    val blob2Drift by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_560, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "FlowCloudBlob2Drift"
-    )
-    val blob3Drift by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1_800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "FlowCloudBlob3Drift"
-    )
-    val blob4Drift by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2_300, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "FlowCloudBlob4Drift"
-    )
+    val motionSpeed = remember { Animatable(if (isPlaying) 1f else 0f) }
+    var motionTimeMs by remember { mutableDoubleStateOf(0.0) }
+    LaunchedEffect(isPlaying) {
+        motionSpeed.animateTo(
+            targetValue = if (isPlaying) 1f else 0f,
+            animationSpec = tween(
+                durationMillis = FLOW_CLOUD_STOP_DURATION_MS,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+    LaunchedEffect(Unit) {
+        var previousFrameNanos = 0L
+        while (isActive) {
+            if (motionSpeed.value <= 0.0001f) {
+                snapshotFlow { motionSpeed.value }.first { it > 0.0001f }
+                previousFrameNanos = 0L
+            }
+            withFrameNanos { frameNanos ->
+                if (previousFrameNanos != 0L) {
+                    val elapsedMs = (frameNanos - previousFrameNanos) / 1_000_000.0
+                    motionTimeMs += elapsedMs * motionSpeed.value
+                }
+                previousFrameNanos = frameNanos
+            }
+        }
+    }
+    val blob1Drift = reverseDrift(motionTimeMs, 1_200)
+    val blob2Drift = reverseDrift(motionTimeMs, 1_560)
+    val blob3Drift = reverseDrift(motionTimeMs, 1_800)
+    val blob4Drift = reverseDrift(motionTimeMs, 2_300)
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
 
     Canvas(
@@ -180,6 +175,7 @@ internal fun FlowCloudBackground(
 internal fun CrossfadeFlowCloudBackground(
     colors: List<Color>,
     progress: Float,
+    isPlaying: Boolean,
     modifier: Modifier = Modifier,
     alpha: Float = 1f
 ) {
@@ -212,6 +208,7 @@ internal fun CrossfadeFlowCloudBackground(
             FlowCloudBackground(
                 colors = oldColors,
                 progress = progress,
+                isPlaying = isPlaying,
                 modifier = Modifier
                     .matchParentSize()
                     .graphicsLayer {
@@ -223,6 +220,7 @@ internal fun CrossfadeFlowCloudBackground(
         FlowCloudBackground(
             colors = displayedColors,
             progress = progress,
+            isPlaying = isPlaying,
             modifier = Modifier
                 .matchParentSize()
                 .graphicsLayer {
@@ -231,6 +229,17 @@ internal fun CrossfadeFlowCloudBackground(
         )
     }
 }
+
+private fun reverseDrift(timeMs: Double, oneWayDurationMs: Int): Float {
+    val cycleProgress = (timeMs % (oneWayDurationMs * 2.0)) / oneWayDurationMs
+    return if (cycleProgress <= 1.0) {
+        cycleProgress.toFloat()
+    } else {
+        (2.0 - cycleProgress).toFloat()
+    }
+}
+
+private const val FLOW_CLOUD_STOP_DURATION_MS = 300
 
 @Composable
 internal fun BlurredArtworkBackground(
