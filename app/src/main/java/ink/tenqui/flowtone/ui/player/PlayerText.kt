@@ -41,6 +41,8 @@ internal fun SharedSongInfo(
     titleColor: Color,
     artistColor: Color,
     playerWidth: Dp,
+    minimizedProgress: Float,
+    minimizedHeight: Dp,
     collapsedHeight: Dp,
     expandedTop: Dp,
     switchDirection: Int,
@@ -54,17 +56,30 @@ internal fun SharedSongInfo(
     val artistStyle = MaterialTheme.typography.bodyMedium
     val metadataLineHorizontalPadding = 6.dp
     val minMetadataLineWidth = 48.dp
+    val minimizedViewportX = 30.dp
     val collapsedViewportX = 30.dp
+    val minimizedControlsReservedWidth = 40.dp * 3f + 4.dp * 2f + 20.dp
     val collapsedControlsReservedWidth = 48.dp * 3f + 8.dp * 2f + 30.dp
-    val collapsedViewportWidth = playerWidth - collapsedViewportX - collapsedControlsReservedWidth
+    val minimizedViewportWidth =
+        playerWidth - minimizedViewportX - minimizedControlsReservedWidth
+    val collapsedViewportWidth =
+        playerWidth - collapsedViewportX - collapsedControlsReservedWidth
+    val minimizedViewportY = minimizedHeight / 2f - metadataGroupHeight / 2f
     val collapsedViewportY = collapsedCenterY - metadataGroupHeight / 2f
     val expandedViewportWidth = playerWidth * 0.82f
     val expandedViewportX = (playerWidth - expandedViewportWidth) / 2f
     val expandedViewportCenterX = expandedViewportX + expandedViewportWidth / 2f
     val expandedViewportY = expandedTop
-    val viewportX = lerpDp(collapsedViewportX, expandedViewportX, progress)
-    val viewportY = lerpDp(collapsedViewportY, expandedViewportY, progress)
-    val viewportWidth = lerpDp(collapsedViewportWidth, expandedViewportWidth, progress)
+    val baseViewportX = lerpDp(minimizedViewportX, collapsedViewportX, minimizedProgress)
+    val baseViewportY = lerpDp(minimizedViewportY, collapsedViewportY, minimizedProgress)
+    val baseViewportWidth = lerpDp(
+        minimizedViewportWidth,
+        collapsedViewportWidth,
+        minimizedProgress
+    )
+    val viewportX = lerpDp(baseViewportX, expandedViewportX, progress)
+    val viewportY = lerpDp(baseViewportY, expandedViewportY, progress)
+    val viewportWidth = lerpDp(baseViewportWidth, expandedViewportWidth, progress)
     val lineHorizontalPadding = lerpDp(0.dp, metadataLineHorizontalPadding, progress)
     val metadataTextAlign = TextAlign.Start
     val metadataState = remember(title, artist) {
@@ -123,7 +138,12 @@ internal fun SharedSongInfo(
         Column(
             modifier = Modifier
                 .width(viewportWidth)
-                .height(metadataGroupHeight),
+                .height(metadataGroupHeight)
+                .graphicsLayer {
+                    translationY = with(density) {
+                        (12.dp * (1f - minimizedProgress)).toPx()
+                    }
+                },
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start
         ) {
@@ -149,6 +169,9 @@ internal fun SharedSongInfo(
                     .width(artistLineBoxWidth)
                     .offset(x = artistX)
                     .padding(top = 4.dp)
+                    .graphicsLayer {
+                        alpha = minimizedProgress
+                    }
             ) {
                 Text(
                     text = blockArtist,

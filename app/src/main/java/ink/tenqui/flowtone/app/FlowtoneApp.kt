@@ -95,6 +95,7 @@ import ink.tenqui.flowtone.ui.library.LibraryScreen
 import ink.tenqui.flowtone.ui.library.LocalLibraryScreen
 import ink.tenqui.flowtone.ui.player.MiniPlayer
 import ink.tenqui.flowtone.ui.player.MiniPlayerCollapsedHeight
+import ink.tenqui.flowtone.ui.player.MiniPlayerMinimizedHeight
 import ink.tenqui.flowtone.ui.player.PlayerUiState
 import ink.tenqui.flowtone.ui.screens.AboutScreen
 import ink.tenqui.flowtone.ui.screens.OpenSourceScreen
@@ -136,6 +137,9 @@ fun FlowtoneApp(
         mutableStateOf(false)
     }
     var miniPlayerExpanded by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var miniPlayerMinimized by rememberSaveable {
         mutableStateOf(false)
     }
     var showSwipeHint by rememberSaveable {
@@ -244,11 +248,23 @@ fun FlowtoneApp(
 
         bottomProtection.toDp()
     }
-    val miniPlayerContentBottomPadding = if (hasCurrentSong) {
-        MiniPlayerCollapsedHeight + miniPlayerBottomProtection
-    } else {
-        0.dp
-    }
+    val miniPlayerContentBottomPadding by animateDpAsState(
+        targetValue = if (hasCurrentSong) {
+            val playerHeight = if (miniPlayerMinimized) {
+                MiniPlayerMinimizedHeight
+            } else {
+                MiniPlayerCollapsedHeight
+            }
+            playerHeight + miniPlayerBottomProtection
+        } else {
+            0.dp
+        },
+        animationSpec = tween(
+            durationMillis = 300,
+            easing = FastOutSlowInEasing
+        ),
+        label = "MiniPlayerContentBottomPadding"
+    )
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -290,6 +306,7 @@ fun FlowtoneApp(
     LaunchedEffect(playerUiState.currentSong) {
         if (playerUiState.currentSong == null) {
             miniPlayerExpanded = false
+            miniPlayerMinimized = false
         }
     }
 
@@ -300,6 +317,7 @@ fun FlowtoneApp(
 
         if (hasCurrentSong) {
             if (!miniPlayerExpanded) {
+                miniPlayerMinimized = false
                 miniPlayerExpanded = true
             }
             onOpenExpandedPlayerRequestConsumed()
@@ -488,7 +506,16 @@ fun FlowtoneApp(
         MiniPlayer(
             playerUiState = playerUiState,
             expanded = miniPlayerExpanded,
-            onExpandedChange = { miniPlayerExpanded = it },
+            onExpandedChange = { expanded ->
+                if (expanded) {
+                    miniPlayerMinimized = false
+                }
+                miniPlayerExpanded = expanded
+            },
+            minimized = miniPlayerMinimized,
+            onMinimizedChange = { minimized ->
+                miniPlayerMinimized = minimized
+            },
             onTogglePlayPause = musicViewModel::togglePlayPause,
             onPlayPrevious = musicViewModel::playPrevious,
             onPlayNext = musicViewModel::playNext,

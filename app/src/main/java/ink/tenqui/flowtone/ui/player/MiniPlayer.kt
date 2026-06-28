@@ -27,9 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
@@ -49,6 +49,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 internal val MiniPlayerCollapsedHeight = 92.dp
+internal val MiniPlayerMinimizedHeight = 52.dp
 internal val MiniPlayerDragHotZoneHeight = 20.dp
 
 @Composable
@@ -56,6 +57,8 @@ fun MiniPlayer(
     playerUiState: PlayerUiState,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
+    minimized: Boolean,
+    onMinimizedChange: (Boolean) -> Unit,
     onTogglePlayPause: () -> Unit,
     onPlayPrevious: () -> Unit,
     onPlayNext: () -> Unit,
@@ -74,6 +77,7 @@ fun MiniPlayer(
     val density = LocalDensity.current
     val context = LocalContext.current
     val collapsedHeight = MiniPlayerCollapsedHeight
+    val minimizedHeight = MiniPlayerMinimizedHeight
     val dragHotZoneHeight = MiniPlayerDragHotZoneHeight
     val swipeThresholdPx = with(density) { 40.dp.toPx() }
     val targetExpandedHeight = configuration.screenHeightDp.dp * 0.618f
@@ -105,6 +109,14 @@ fun MiniPlayer(
         ),
         label = "MiniPlayerProgress"
     )
+    val minimizedProgress by animateFloatAsState(
+        targetValue = if (minimized) 0f else 1f,
+        animationSpec = tween(
+            durationMillis = MINI_PLAYER_MINIMIZE_ANIMATION_DURATION_MS,
+            easing = FastOutSlowInEasing
+        ),
+        label = "MiniPlayerMinimizedProgress"
+    )
     val artworkAnimationProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = tween(
@@ -125,7 +137,8 @@ fun MiniPlayer(
         ),
         label = "MiniPlayerArtworkScaleProgress"
     )
-    val currentHeight = collapsedHeight + (expandedHeight - collapsedHeight) * animationProgress
+    val baseHeight = lerpDp(minimizedHeight, collapsedHeight, minimizedProgress)
+    val currentHeight = baseHeight + (expandedHeight - collapsedHeight) * animationProgress
     val visibleProgress by animateFloatAsState(
         targetValue = if (hasCurrentSong) 1f else 0f,
         animationSpec = tween(
@@ -330,7 +343,12 @@ fun MiniPlayer(
         }
     }
     var accumulatedDragY by remember { mutableStateOf(0f) }
-    val gestureModifier = Modifier.pointerInput(hasCurrentSong, expanded, swipeThresholdPx) {
+    val gestureModifier = Modifier.pointerInput(
+        hasCurrentSong,
+        expanded,
+        minimized,
+        swipeThresholdPx
+    ) {
         detectVerticalDragGestures(
             onDragStart = {
                 accumulatedDragY = 0f
@@ -344,10 +362,19 @@ fun MiniPlayer(
                 if (!hasCurrentSong) {
                     return@detectVerticalDragGestures
                 }
-                if (!expanded && accumulatedDragY <= -swipeThresholdPx) {
-                    onExpandedChange(true)
-                } else if (expanded && accumulatedDragY >= swipeThresholdPx) {
-                    onExpandedChange(false)
+                when {
+                    accumulatedDragY <= -swipeThresholdPx && minimized -> {
+                        onMinimizedChange(false)
+                    }
+                    accumulatedDragY <= -swipeThresholdPx && !expanded -> {
+                        onExpandedChange(true)
+                    }
+                    accumulatedDragY >= swipeThresholdPx && expanded -> {
+                        onExpandedChange(false)
+                    }
+                    accumulatedDragY >= swipeThresholdPx && !minimized -> {
+                        onMinimizedChange(true)
+                    }
                 }
             },
             onDragCancel = {
@@ -373,7 +400,13 @@ fun MiniPlayer(
             hasCurrentSong = hasCurrentSong,
             expanded = expanded,
             interactionSource = noRippleInteractionSource,
-            onExpandedChange = onExpandedChange,
+            onActivate = {
+                if (minimized) {
+                    onMinimizedChange(false)
+                } else {
+                    onExpandedChange(true)
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(dragHotZoneHeight)
@@ -395,7 +428,11 @@ fun MiniPlayer(
                     interactionSource = noRippleInteractionSource,
                     indication = null
                 ) {
-                    onExpandedChange(true)
+                    if (minimized) {
+                        onMinimizedChange(false)
+                    } else {
+                        onExpandedChange(true)
+                    }
                 }
         ) {
             BoxWithConstraints(
@@ -403,7 +440,11 @@ fun MiniPlayer(
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .height(currentHeight)
-                .clip(playerShape)
+                .graphicsLayer {
+                    shape = playerShape
+                    clip = true
+                    compositingStrategy = CompositingStrategy.Offscreen
+                }
                 .then(
                     if (hasArtworkBackground) {
                             Modifier
@@ -445,6 +486,11 @@ fun MiniPlayer(
                     expandedArtworkTop = expandedArtworkTop,
                     modifier = Modifier
                         .align(Alignment.TopStart)
+                        .graphicsLayer {
+                            translationY = with(density) {
+                                (16.dp * (1f - minimizedProgress)).toPx()
+                            }
+                        }
                 )
                 Box(
                     modifier = Modifier
@@ -459,6 +505,8 @@ fun MiniPlayer(
                         titleColor = titleColor,
                         artistColor = artistColor,
                         playerWidth = playerWidth,
+                        minimizedProgress = minimizedProgress,
+                        minimizedHeight = minimizedHeight,
                         collapsedHeight = collapsedHeight,
                         expandedTop = expandedMetadataTop,
                         switchDirection = collapsedMetadataSwitchDirection,
@@ -489,6 +537,8 @@ fun MiniPlayer(
                         isPlaying = visualIsPlaying,
                         iconColor = controlIconColor,
                         screenWidth = playerWidth,
+                        minimizedProgress = minimizedProgress,
+                        minimizedHeight = minimizedHeight,
                         collapsedHeight = collapsedHeight,
                         expandedTop = expandedControlsTop,
                         onPlayPrevious = {

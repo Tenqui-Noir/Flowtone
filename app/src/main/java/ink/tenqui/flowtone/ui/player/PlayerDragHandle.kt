@@ -26,7 +26,7 @@ internal fun PlayerDragHandle(
     hasCurrentSong: Boolean,
     expanded: Boolean,
     interactionSource: MutableInteractionSource,
-    onExpandedChange: (Boolean) -> Unit,
+    onActivate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -36,7 +36,7 @@ internal fun PlayerDragHandle(
                 interactionSource = interactionSource,
                 indication = null
             ) {
-                onExpandedChange(true)
+                onActivate()
             }
     ) {
         val handleAlpha = lerpFloat(1f, 0.65f, animationProgress)

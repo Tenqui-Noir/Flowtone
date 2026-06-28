@@ -36,6 +36,8 @@ internal fun SharedPlaybackControls(
     isPlaying: Boolean,
     iconColor: Color,
     screenWidth: Dp,
+    minimizedProgress: Float,
+    minimizedHeight: Dp,
     collapsedHeight: Dp,
     expandedTop: Dp,
     onPlayPrevious: () -> Unit,
@@ -43,9 +45,11 @@ internal fun SharedPlaybackControls(
     onPlayNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val minimizedTouchSize = 40.dp
     val collapsedTouchSize = 48.dp
     val expandedPreviousNextTouchSize = 64.dp
     val expandedPlayPauseTouchSize = 80.dp
+    val minimizedSpacing = 4.dp
     val collapsedSpacing = 8.dp
     val progressWidth = screenWidth * 0.76f
     val expandedSpacing = if (progressWidth / 6f < 36.dp) {
@@ -53,25 +57,35 @@ internal fun SharedPlaybackControls(
     } else {
         36.dp
     }
-    val previousNextTouchSize = lerpDp(collapsedTouchSize, expandedPreviousNextTouchSize, progress)
-    val playPauseTouchSize = lerpDp(collapsedTouchSize, expandedPlayPauseTouchSize, progress)
-    val previousNextIconSize = lerpDp(24.dp, 32.dp, progress)
-    val playPauseIconSize = lerpDp(28.dp, 42.dp, progress)
-    val spacing = lerpDp(collapsedSpacing, expandedSpacing, progress)
-    val collapsedControlsWidth = collapsedTouchSize * 3f + collapsedSpacing * 2f
+    val baseTouchSize = lerpDp(minimizedTouchSize, collapsedTouchSize, minimizedProgress)
+    val basePreviousNextIconSize = lerpDp(20.dp, 24.dp, minimizedProgress)
+    val basePlayPauseIconSize = lerpDp(24.dp, 28.dp, minimizedProgress)
+    val baseSpacing = lerpDp(minimizedSpacing, collapsedSpacing, minimizedProgress)
+    val previousNextTouchSize = lerpDp(
+        baseTouchSize,
+        expandedPreviousNextTouchSize,
+        progress
+    )
+    val playPauseTouchSize = lerpDp(baseTouchSize, expandedPlayPauseTouchSize, progress)
+    val previousNextIconSize = lerpDp(basePreviousNextIconSize, 32.dp, progress)
+    val playPauseIconSize = lerpDp(basePlayPauseIconSize, 42.dp, progress)
+    val spacing = lerpDp(baseSpacing, expandedSpacing, progress)
+    val baseControlsWidth = baseTouchSize * 3f + baseSpacing * 2f
     val controlsWidth = previousNextTouchSize * 2f + playPauseTouchSize + spacing * 2f
-    val collapsedLeft = screenWidth - collapsedControlsWidth - 30.dp
-    val collapsedControlsY = (collapsedHeight - collapsedTouchSize) / 2f
-    val currentTop = lerpDp(collapsedControlsY, expandedTop, progress)
+    val baseEndPadding = lerpDp(20.dp, 30.dp, minimizedProgress)
+    val baseLeft = screenWidth - baseControlsWidth - baseEndPadding
+    val baseHeight = lerpDp(minimizedHeight, collapsedHeight, minimizedProgress)
+    val baseControlsY = (baseHeight - baseTouchSize) / 2f
+    val currentTop = lerpDp(baseControlsY, expandedTop, progress)
     val progressWidthLeft = (screenWidth - progressWidth) / 2f
     val favoriteCenterX = progressWidthLeft + 24.dp
     val orderCenterX = progressWidthLeft + progressWidth - 24.dp
     val playPauseCenterX = screenWidth / 2f
     val previousCenterX = (favoriteCenterX + playPauseCenterX) / 2f
     val nextCenterX = (playPauseCenterX + orderCenterX) / 2f
-    val collapsedPreviousX = collapsedLeft
-    val collapsedPlayPauseX = collapsedLeft + collapsedTouchSize + collapsedSpacing
-    val collapsedNextX = collapsedPlayPauseX + collapsedTouchSize + collapsedSpacing
+    val collapsedPreviousX = baseLeft
+    val collapsedPlayPauseX = baseLeft + baseTouchSize + baseSpacing
+    val collapsedNextX = collapsedPlayPauseX + baseTouchSize + baseSpacing
     val expandedPreviousX = previousCenterX - expandedPreviousNextTouchSize / 2f
     val expandedPlayPauseX = playPauseCenterX - expandedPlayPauseTouchSize / 2f
     val expandedNextX = nextCenterX - expandedPreviousNextTouchSize / 2f

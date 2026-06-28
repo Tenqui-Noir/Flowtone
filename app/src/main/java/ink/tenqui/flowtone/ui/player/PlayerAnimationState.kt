@@ -4,6 +4,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.ui.unit.Dp
 
 internal const val MINI_PLAYER_ANIMATION_DURATION_MS = 400
+internal const val MINI_PLAYER_MINIMIZE_ANIMATION_DURATION_MS = 300
 internal const val ARTWORK_ANIMATION_DURATION_MS = 400
 internal const val FLOWTONE_CLOUD_COLORS_TAG = "FlowtoneCloudColors"
 internal val MiniPlayerEasing = CubicBezierEasing(0.23f,1f,0.32f,1f)
