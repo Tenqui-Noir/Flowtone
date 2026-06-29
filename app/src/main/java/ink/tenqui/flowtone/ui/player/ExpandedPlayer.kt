@@ -18,6 +18,7 @@ internal fun ExpandedOnlyContent(
     hasCurrentSong: Boolean,
     progressTrackColor: Color,
     progressColor: Color,
+    fullscreenProgress: Float,
     onSeekTo: (Long) -> Unit,
     onLockPlayPauseVisual: (Boolean) -> Unit,
     onScrubbingChange: (Boolean) -> Unit,
@@ -43,6 +44,7 @@ internal fun ExpandedOnlyContent(
             onLockPlayPauseVisual = onLockPlayPauseVisual,
             onScrubbingChange = onScrubbingChange,
             enterProgress = progressEnterProgress,
+            fullscreenProgress = fullscreenProgress,
             modifier = Modifier
                 .fillMaxWidth(0.76f)
         )

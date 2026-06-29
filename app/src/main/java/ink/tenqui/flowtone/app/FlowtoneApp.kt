@@ -561,6 +561,7 @@ fun FlowtoneApp(
             onMinimizedChange = { minimized ->
                 if (minimized) {
                     miniPlayerFullscreen = false
+                    miniPlayerExpanded = false
                 }
                 miniPlayerMinimized = minimized
             },

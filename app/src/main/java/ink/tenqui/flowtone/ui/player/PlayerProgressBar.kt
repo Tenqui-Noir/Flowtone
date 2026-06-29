@@ -70,6 +70,7 @@ internal fun PlaybackProgressBar(
     onLockPlayPauseVisual: (Boolean) -> Unit,
     onScrubbingChange: (Boolean) -> Unit,
     enterProgress: Float,
+    fullscreenProgress: Float,
     modifier: Modifier = Modifier
 ) {
     var isScrubbing by remember { mutableStateOf(false) }

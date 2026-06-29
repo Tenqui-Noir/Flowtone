@@ -40,6 +40,7 @@ internal fun SharedPlaybackControls(
     minimizedHeight: Dp,
     collapsedHeight: Dp,
     expandedTop: Dp,
+    fullscreenProgress: Float,
     onPlayPrevious: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onPlayNext: () -> Unit,
@@ -92,6 +93,7 @@ internal fun SharedPlaybackControls(
     val previousX = lerpDp(collapsedPreviousX, expandedPreviousX, progress)
     val playPauseX = lerpDp(collapsedPlayPauseX, expandedPlayPauseX, progress)
     val nextX = lerpDp(collapsedNextX, expandedNextX, progress)
+    val fullscreenScale = lerpFloat(1f, 1.2f, fullscreenProgress)
 
     Box(
         modifier = modifier
@@ -108,6 +110,8 @@ internal fun SharedPlaybackControls(
                 .graphicsLayer {
                     translationX = previousX.toPx()
                     translationY = ((playPauseTouchSize - previousNextTouchSize) / 2f).toPx()
+                    scaleX = fullscreenScale
+                    scaleY = fullscreenScale
                 }
         ) {
             Icon(
@@ -123,6 +127,8 @@ internal fun SharedPlaybackControls(
                 .size(playPauseTouchSize)
                 .graphicsLayer {
                     translationX = playPauseX.toPx()
+                    scaleX = fullscreenScale
+                    scaleY = fullscreenScale
                 }
         ) {
             Icon(
@@ -147,6 +153,8 @@ internal fun SharedPlaybackControls(
                 .graphicsLayer {
                     translationX = nextX.toPx()
                     translationY = ((playPauseTouchSize - previousNextTouchSize) / 2f).toPx()
+                    scaleX = fullscreenScale
+                    scaleY = fullscreenScale
                 }
         ) {
             Icon(
@@ -170,6 +178,7 @@ internal fun SideButtonsOverlay(
     isCurrentSongLiked: Boolean,
     playbackOrderMode: PlaybackOrderMode,
     iconColor: Color,
+    fullscreenProgress: Float,
     onToggleLiked: () -> Unit,
     onTogglePlaybackOrderMode: () -> Unit,
     modifier: Modifier = Modifier
@@ -183,6 +192,7 @@ internal fun SideButtonsOverlay(
     val parentGrowthCompensationY = currentHeight - expandedHeight
     val buttonY = parentGrowthCompensationY + buttonEndY + 300.dp * (1f - enterProgress)
     val scale = lerpFloat(2.6f, 1.0f, enterProgress)
+    val fullscreenScale = lerpFloat(1f, 1.08f, fullscreenProgress)
     val buttonAlpha = lerpFloat(0.18f, 1.0f, enterProgress)
 
     Box(modifier = modifier) {
@@ -197,8 +207,8 @@ internal fun SideButtonsOverlay(
                 .offset(x = favoriteX, y = buttonY)
                 .size(buttonSize)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = scale * fullscreenScale
+                    scaleY = scale * fullscreenScale
                     alpha = buttonAlpha
                 }
         )
@@ -215,8 +225,8 @@ internal fun SideButtonsOverlay(
                 .offset(x = orderX, y = buttonY)
                 .size(buttonSize)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = scale * fullscreenScale
+                    scaleY = scale * fullscreenScale
                     alpha = buttonAlpha
                 }
         )

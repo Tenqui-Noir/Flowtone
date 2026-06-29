@@ -84,7 +84,7 @@ internal fun SharedSongInfo(
     val defaultViewportX = lerpDp(baseViewportX, expandedViewportX, progress)
     val defaultViewportY = lerpDp(baseViewportY, expandedViewportY, progress)
     val defaultViewportWidth = lerpDp(baseViewportWidth, expandedViewportWidth, progress)
-    val fullscreenTitleScale = lerpFloat(1f, 1.4f, fullscreenProgress)
+    val fullscreenTitleScale = lerpFloat(1f, 1.7f, fullscreenProgress)
     val fullscreenArtistScale = lerpFloat(1f, 1.3f, fullscreenProgress)
     val fullscreenArtistAlpha = lerpFloat(1f, 0.8f, fullscreenProgress)
     val fullscreenViewportWidth = ((playerWidth - fullscreenX) / 2f).coerceAtLeast(minMetadataLineWidth)
@@ -161,6 +161,7 @@ internal fun SharedSongInfo(
             fullscreenProgress
         )
         val fullscreenArtistTopPadding = lerpDp(4.dp, 14.dp, fullscreenProgress)
+        val artistMinimizedAlpha = lerpFloat(minimizedProgress, 1f, progress)
 
         Column(
             modifier = Modifier
@@ -202,7 +203,7 @@ internal fun SharedSongInfo(
                     .offset(x = artistX)
                     .padding(top = fullscreenArtistTopPadding)
                     .graphicsLayer {
-                        alpha = minimizedProgress * fullscreenArtistAlpha
+                        alpha = artistMinimizedAlpha * fullscreenArtistAlpha
                         scaleX = fullscreenArtistScale
                         scaleY = fullscreenArtistScale
                         transformOrigin = TransformOrigin(0f, 0f)

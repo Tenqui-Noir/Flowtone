@@ -161,6 +161,7 @@ fun MiniPlayer(
         ),
         label = "MiniPlayerFullscreenProgress"
     )
+    val fullscreenInteractionActive = fullscreen || fullscreenProgress > 0.01f
     val hostHeight = lerpDp(
         currentHeight + dragHotZoneHeight,
         fullscreenTargetHeight,
@@ -172,7 +173,7 @@ fun MiniPlayer(
     val fullscreenCoverCenterY = fullscreenTargetHeight * 0.4f
     val fullscreenStationaryControlsOffsetY =
         (fullscreenTargetHeight - currentHeight) * fullscreenProgress
-    val fullscreenControlsLiftY = 0.dp * fullscreenProgress
+    val fullscreenControlsLiftY = 52.dp * fullscreenProgress
     val visibleProgress by animateFloatAsState(
         targetValue = if (hasCurrentSong) 1f else 0f,
         animationSpec = tween(
@@ -382,7 +383,7 @@ fun MiniPlayer(
     val gestureModifier = Modifier.pointerInput(
         hasCurrentSong,
         expanded,
-        fullscreen,
+        fullscreenInteractionActive,
         minimized,
         swipeThresholdPx,
         fullscreenSwipeThresholdPx,
@@ -408,6 +409,7 @@ fun MiniPlayer(
                     }
                     accumulatedDragY <= -fullscreenSwipeThresholdPx &&
                         !expanded &&
+                        !fullscreenInteractionActive &&
                         allowFullscreenFromCollapsed -> {
                         onMinimizedChange(false)
                         onExpandedChange(true)
@@ -415,20 +417,23 @@ fun MiniPlayer(
                     }
                     accumulatedDragY <= -fullscreenSwipeThresholdPx &&
                         expanded &&
-                        !fullscreen &&
+                        !fullscreenInteractionActive &&
                         allowFullscreenFromExpanded -> {
                         onFullscreenChange(true)
                     }
                     accumulatedDragY <= -swipeThresholdPx && !expanded -> {
                         onExpandedChange(true)
                     }
-                    accumulatedDragY >= fullscreenSwipeThresholdPx && fullscreen -> {
+                    accumulatedDragY >= fullscreenSwipeThresholdPx && fullscreenInteractionActive -> {
                         onFullscreenChange(false)
                     }
-                    accumulatedDragY >= swipeThresholdPx && expanded && !fullscreen -> {
+                    accumulatedDragY >= swipeThresholdPx && expanded && !fullscreenInteractionActive -> {
                         onExpandedChange(false)
                     }
-                    accumulatedDragY >= swipeThresholdPx && !minimized -> {
+                    accumulatedDragY >= swipeThresholdPx &&
+                        !expanded &&
+                        !fullscreenInteractionActive &&
+                        !minimized -> {
                         onMinimizedChange(true)
                     }
                 }
@@ -601,6 +606,7 @@ fun MiniPlayer(
                         hasCurrentSong = hasCurrentSong,
                         progressTrackColor = progressTrackColor,
                         progressColor = progressColor,
+                        fullscreenProgress = fullscreenProgress,
                         onSeekTo = onSeekTo,
                         onLockPlayPauseVisual = ::lockPlayPauseVisual,
                         onScrubbingChange = { scrubbing ->
@@ -622,6 +628,7 @@ fun MiniPlayer(
                         minimizedHeight = minimizedHeight,
                         collapsedHeight = collapsedHeight,
                         expandedTop = expandedControlsTop,
+                        fullscreenProgress = fullscreenProgress,
                         onPlayPrevious = {
                             if (hasCurrentSong) {
                                 collapsedMetadataSwitchDirection = -1
@@ -659,6 +666,7 @@ fun MiniPlayer(
                         isCurrentSongLiked = isCurrentSongLiked,
                         playbackOrderMode = playerUiState.playbackOrderMode,
                         iconColor = controlIconColor,
+                        fullscreenProgress = fullscreenProgress,
                         onToggleLiked = {
                             currentSongKey?.let { key ->
                                 likedSongKeys = if (likedSongKeys.contains(key)) {
