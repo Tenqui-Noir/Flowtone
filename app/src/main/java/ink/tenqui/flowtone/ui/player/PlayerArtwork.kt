@@ -134,17 +134,24 @@ internal fun MorphArtworkLayer(
     playerWidth: Dp,
     expandedArtworkSize: Dp,
     expandedArtworkTop: Dp,
+    fullscreenProgress: Float = 0f,
+    fullscreenArtworkSize: Dp = expandedArtworkSize,
+    fullscreenArtworkCenterY: Dp = expandedArtworkTop + expandedArtworkSize / 2f,
     modifier: Modifier = Modifier
 ) {
-    val expandedX = (playerWidth - expandedArtworkSize) / 2f
-    val artworkX = expandedX
-    val artworkSize = expandedArtworkSize
+    val baseArtworkSize = expandedArtworkSize
+    val expandedX = (playerWidth - baseArtworkSize) / 2f
+    val fullscreenX = (playerWidth - fullscreenArtworkSize) / 2f
+    val artworkX = lerpDp(expandedX, fullscreenX, fullscreenProgress)
+    val artworkSize = lerpDp(baseArtworkSize, fullscreenArtworkSize, fullscreenProgress)
     val collapsedContainerScale = 2f
     val collapsedAnchorFraction = 0.382f
     val collapsedArtworkCenterY = collapsedHeight * 0.5f
     val collapsedArtworkTop = collapsedArtworkCenterY -
-        artworkSize * (0.5f + (collapsedAnchorFraction - 0.5f) * collapsedContainerScale)
-    val artworkY = lerpDp(collapsedArtworkTop, expandedArtworkTop, progress)
+        baseArtworkSize * (0.5f + (collapsedAnchorFraction - 0.5f) * collapsedContainerScale)
+    val baseArtworkY = lerpDp(collapsedArtworkTop, expandedArtworkTop, progress)
+    val fullscreenArtworkY = fullscreenArtworkCenterY - fullscreenArtworkSize / 2f
+    val artworkY = lerpDp(baseArtworkY, fullscreenArtworkY, fullscreenProgress)
     val blurRadius = lerpDp(16.dp, 0.dp, progress)
     val cornerRadius = lerpDp(24.dp, 28.dp, progress)
     val shadowPadding = 32.dp

@@ -37,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -58,6 +59,11 @@ fun MiniPlayer(
     playerUiState: PlayerUiState,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
+    fullscreen: Boolean,
+    onFullscreenChange: (Boolean) -> Unit,
+    fullscreenHeight: Dp,
+    allowFullscreenFromCollapsed: Boolean = false,
+    allowFullscreenFromExpanded: Boolean = true,
     minimized: Boolean,
     onMinimizedChange: (Boolean) -> Unit,
     onTogglePlayPause: () -> Unit,
@@ -82,6 +88,7 @@ fun MiniPlayer(
     val minimizedHeight = MiniPlayerMinimizedHeight
     val dragHotZoneHeight = MiniPlayerDragHotZoneHeight
     val swipeThresholdPx = with(density) { 40.dp.toPx() }
+    val fullscreenSwipeThresholdPx = with(density) { 72.dp.toPx() }
     val targetExpandedHeight = configuration.screenHeightDp.dp * 0.618f
     val widthBasedArtworkSize = if (configuration.screenWidthDp.dp * 0.76f < 340.dp) {
         configuration.screenWidthDp.dp * 0.76f
@@ -92,6 +99,11 @@ fun MiniPlayer(
         targetExpandedHeight
     } else {
         collapsedHeight
+    }
+    val fullscreenTargetHeight = if (fullscreenHeight > expandedHeight) {
+        fullscreenHeight
+    } else {
+        expandedHeight
     }
     val heightLimitedArtworkSize = expandedHeight * 0.52f
     val expandedArtworkSize = if (widthBasedArtworkSize < heightLimitedArtworkSize) {
@@ -141,6 +153,26 @@ fun MiniPlayer(
     )
     val baseHeight = lerpDp(minimizedHeight, collapsedHeight, minimizedProgress)
     val currentHeight = baseHeight + (expandedHeight - collapsedHeight) * animationProgress
+    val fullscreenProgress by animateFloatAsState(
+        targetValue = if (fullscreen && expanded && hasCurrentSong) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = MINI_PLAYER_ANIMATION_DURATION_MS,
+            easing = MiniPlayerEasing
+        ),
+        label = "MiniPlayerFullscreenProgress"
+    )
+    val hostHeight = lerpDp(
+        currentHeight + dragHotZoneHeight,
+        fullscreenTargetHeight,
+        fullscreenProgress
+    )
+    val visualPanelHeight = lerpDp(currentHeight, fullscreenTargetHeight, fullscreenProgress)
+    val visualPanelTop = hostHeight - visualPanelHeight
+    val handleOffsetY = (visualPanelHeight + dragHotZoneHeight) * fullscreenProgress
+    val fullscreenCoverCenterY = fullscreenTargetHeight * 0.4f
+    val fullscreenStationaryControlsOffsetY =
+        (fullscreenTargetHeight - currentHeight) * fullscreenProgress
+    val fullscreenControlsLiftY = 0.dp * fullscreenProgress
     val visibleProgress by animateFloatAsState(
         targetValue = if (hasCurrentSong) 1f else 0f,
         animationSpec = tween(
@@ -350,8 +382,12 @@ fun MiniPlayer(
     val gestureModifier = Modifier.pointerInput(
         hasCurrentSong,
         expanded,
+        fullscreen,
         minimized,
-        swipeThresholdPx
+        swipeThresholdPx,
+        fullscreenSwipeThresholdPx,
+        allowFullscreenFromCollapsed,
+        allowFullscreenFromExpanded
     ) {
         detectVerticalDragGestures(
             onDragStart = {
@@ -370,10 +406,26 @@ fun MiniPlayer(
                     accumulatedDragY <= -swipeThresholdPx && minimized -> {
                         onMinimizedChange(false)
                     }
+                    accumulatedDragY <= -fullscreenSwipeThresholdPx &&
+                        !expanded &&
+                        allowFullscreenFromCollapsed -> {
+                        onMinimizedChange(false)
+                        onExpandedChange(true)
+                        onFullscreenChange(true)
+                    }
+                    accumulatedDragY <= -fullscreenSwipeThresholdPx &&
+                        expanded &&
+                        !fullscreen &&
+                        allowFullscreenFromExpanded -> {
+                        onFullscreenChange(true)
+                    }
                     accumulatedDragY <= -swipeThresholdPx && !expanded -> {
                         onExpandedChange(true)
                     }
-                    accumulatedDragY >= swipeThresholdPx && expanded -> {
+                    accumulatedDragY >= fullscreenSwipeThresholdPx && fullscreen -> {
+                        onFullscreenChange(false)
+                    }
+                    accumulatedDragY >= swipeThresholdPx && expanded && !fullscreen -> {
                         onExpandedChange(false)
                     }
                     accumulatedDragY >= swipeThresholdPx && !minimized -> {
@@ -390,16 +442,17 @@ fun MiniPlayer(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(currentHeight + dragHotZoneHeight)
+            .height(hostHeight)
             .graphicsLayer {
                 translationY = miniPlayerSlideOffsetY.toPx()
                 alpha = visibleProgress
+                clip = fullscreenProgress > 0.01f
             }
             .then(gestureModifier)
     ) {
         val playerShape = RoundedCornerShape(
-            topStart = 24.dp,
-            topEnd = 24.dp,
+            topStart = lerpDp(24.dp, 0.dp, fullscreenProgress),
+            topEnd = lerpDp(24.dp, 0.dp, fullscreenProgress),
             bottomStart = 0.dp,
             bottomEnd = 0.dp
         )
@@ -419,14 +472,17 @@ fun MiniPlayer(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(dragHotZoneHeight)
+                .graphicsLayer {
+                    translationY = handleOffsetY.toPx()
+                }
                 .align(Alignment.TopCenter)
         )
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = dragHotZoneHeight)
+                .offset(y = visualPanelTop)
                 .fillMaxWidth()
-                .height(currentHeight)
+                .height(visualPanelHeight)
                 .shadow(
                     elevation = playerShadowElevation,
                     shape = playerShape,
@@ -448,7 +504,7 @@ fun MiniPlayer(
                 modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .height(currentHeight)
+                .height(visualPanelHeight)
                 .graphicsLayer {
                     shape = playerShape
                     clip = true
@@ -485,6 +541,10 @@ fun MiniPlayer(
                         .matchParentSize()
                         .background(Color.Black.copy(alpha = lerpFloat(0.24f, 0.36f, animationProgress)))
                 )
+                val fullscreenProgressTrackWidth = playerWidth * 0.76f
+                val fullscreenArtworkX = (playerWidth - fullscreenProgressTrackWidth) / 2f
+                val fullscreenMetadataTop =
+                    fullscreenCoverCenterY + fullscreenProgressTrackWidth / 2f + 14.dp
                 MorphArtworkLayer(
                     imageRequest = coverImageRequest,
                     waitForArtworkLoad = useLocalArtworkLoading,
@@ -496,11 +556,14 @@ fun MiniPlayer(
                     playerWidth = playerWidth,
                     expandedArtworkSize = expandedArtworkSize,
                     expandedArtworkTop = expandedArtworkTop,
+                    fullscreenProgress = fullscreenProgress,
+                    fullscreenArtworkSize = fullscreenProgressTrackWidth,
+                    fullscreenArtworkCenterY = fullscreenCoverCenterY,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .graphicsLayer {
                             translationY = with(density) {
-                                (16.dp * (1f - minimizedProgress)).toPx()
+                                (16.dp * (1f - minimizedProgress) * (1f - fullscreenProgress)).toPx()
                             }
                         }
                 )
@@ -521,6 +584,9 @@ fun MiniPlayer(
                         minimizedHeight = minimizedHeight,
                         collapsedHeight = collapsedHeight,
                         expandedTop = expandedMetadataTop,
+                        fullscreenProgress = fullscreenProgress,
+                        fullscreenX = fullscreenArtworkX,
+                        fullscreenTop = fullscreenMetadataTop,
                         switchDirection = collapsedMetadataSwitchDirection,
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -543,6 +609,9 @@ fun MiniPlayer(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .padding(top = expandedProgressTop)
+                            .graphicsLayer {
+                                translationY = (fullscreenStationaryControlsOffsetY - fullscreenControlsLiftY).toPx()
+                            }
                     )
                     SharedPlaybackControls(
                         progress = animationProgress,
@@ -576,6 +645,9 @@ fun MiniPlayer(
                         },
                         modifier = Modifier
                             .align(Alignment.TopStart)
+                            .graphicsLayer {
+                                translationY = (fullscreenStationaryControlsOffsetY - fullscreenControlsLiftY).toPx()
+                            }
                     )
                     SideButtonsOverlay(
                         progress = animationProgress,
@@ -598,7 +670,10 @@ fun MiniPlayer(
                         },
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                translationY = (fullscreenStationaryControlsOffsetY - fullscreenControlsLiftY).toPx()
+                            },
                         onTogglePlaybackOrderMode = onTogglePlaybackOrderMode
                     )
                 }

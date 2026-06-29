@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -45,6 +46,9 @@ internal fun SharedSongInfo(
     minimizedHeight: Dp,
     collapsedHeight: Dp,
     expandedTop: Dp,
+    fullscreenProgress: Float = 0f,
+    fullscreenX: Dp = 0.dp,
+    fullscreenTop: Dp = 0.dp,
     switchDirection: Int,
     modifier: Modifier = Modifier
 ) {
@@ -77,10 +81,23 @@ internal fun SharedSongInfo(
         collapsedViewportWidth,
         minimizedProgress
     )
-    val viewportX = lerpDp(baseViewportX, expandedViewportX, progress)
-    val viewportY = lerpDp(baseViewportY, expandedViewportY, progress)
-    val viewportWidth = lerpDp(baseViewportWidth, expandedViewportWidth, progress)
-    val lineHorizontalPadding = lerpDp(0.dp, metadataLineHorizontalPadding, progress)
+    val defaultViewportX = lerpDp(baseViewportX, expandedViewportX, progress)
+    val defaultViewportY = lerpDp(baseViewportY, expandedViewportY, progress)
+    val defaultViewportWidth = lerpDp(baseViewportWidth, expandedViewportWidth, progress)
+    val fullscreenTitleScale = lerpFloat(1f, 1.4f, fullscreenProgress)
+    val fullscreenArtistScale = lerpFloat(1f, 1.3f, fullscreenProgress)
+    val fullscreenArtistAlpha = lerpFloat(1f, 0.8f, fullscreenProgress)
+    val fullscreenViewportWidth = ((playerWidth - fullscreenX) / 2f).coerceAtLeast(minMetadataLineWidth)
+    val viewportX = lerpDp(defaultViewportX, fullscreenX, fullscreenProgress)
+    val viewportY = lerpDp(defaultViewportY, fullscreenTop, fullscreenProgress)
+    val viewportWidth = lerpDp(defaultViewportWidth, fullscreenViewportWidth, fullscreenProgress)
+    val viewportClipWidth = viewportWidth * fullscreenTitleScale
+    val viewportClipHeight = metadataGroupHeight * fullscreenTitleScale
+    val lineHorizontalPadding = lerpDp(
+        lerpDp(0.dp, metadataLineHorizontalPadding, progress),
+        0.dp,
+        fullscreenProgress
+    )
     val metadataTextAlign = TextAlign.Start
     val metadataState = remember(title, artist) {
         CollapsedMetadataState(title = title, artist = artist)
@@ -104,10 +121,11 @@ internal fun SharedSongInfo(
                 maxLines = 1
             ).size.width.toDp()
         }
-        val titleLineBoxWidth = (titleWidth + metadataLineHorizontalPadding * 2f)
-            .coerceIn(minMetadataLineWidth, expandedViewportWidth)
-        val artistLineBoxWidth = (artistWidth + metadataLineHorizontalPadding * 2f)
-            .coerceIn(minMetadataLineWidth, expandedViewportWidth)
+        val maxMetadataLineWidth = lerpDp(expandedViewportWidth, viewportWidth, fullscreenProgress)
+        val titleLineBoxWidth = (titleWidth + lineHorizontalPadding * 2f)
+            .coerceIn(minMetadataLineWidth, maxMetadataLineWidth)
+        val artistLineBoxWidth = (artistWidth + lineHorizontalPadding * 2f)
+            .coerceIn(minMetadataLineWidth, maxMetadataLineWidth)
         val collapsedTitleX = 0.dp
         val expandedTitleContentWidth = titleWidth.coerceAtMost(
             expandedViewportWidth - metadataLineHorizontalPadding * 2f
@@ -132,8 +150,17 @@ internal fun SharedSongInfo(
         } else {
             expandedArtistRelativeX
         }
-        val titleX = lerpDp(collapsedTitleX, expandedTitleX, progress)
-        val artistX = lerpDp(collapsedArtistX, expandedArtistX, progress)
+        val titleX = lerpDp(
+            lerpDp(collapsedTitleX, expandedTitleX, progress),
+            0.dp,
+            fullscreenProgress
+        )
+        val artistX = lerpDp(
+            lerpDp(collapsedArtistX, expandedArtistX, progress),
+            0.dp,
+            fullscreenProgress
+        )
+        val fullscreenArtistTopPadding = lerpDp(4.dp, 14.dp, fullscreenProgress)
 
         Column(
             modifier = Modifier
@@ -151,6 +178,11 @@ internal fun SharedSongInfo(
                 modifier = Modifier
                     .width(titleLineBoxWidth)
                     .offset(x = titleX)
+                    .graphicsLayer {
+                        scaleX = fullscreenTitleScale
+                        scaleY = fullscreenTitleScale
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    }
             ) {
                 Text(
                     text = blockTitle,
@@ -168,9 +200,12 @@ internal fun SharedSongInfo(
                 modifier = Modifier
                     .width(artistLineBoxWidth)
                     .offset(x = artistX)
-                    .padding(top = 4.dp)
+                    .padding(top = fullscreenArtistTopPadding)
                     .graphicsLayer {
-                        alpha = minimizedProgress
+                        alpha = minimizedProgress * fullscreenArtistAlpha
+                        scaleX = fullscreenArtistScale
+                        scaleY = fullscreenArtistScale
+                        transformOrigin = TransformOrigin(0f, 0f)
                     }
             ) {
                 Text(
@@ -190,8 +225,8 @@ internal fun SharedSongInfo(
 
     Box(
         modifier = modifier
-            .width(viewportWidth)
-            .height(metadataGroupHeight)
+            .width(viewportClipWidth)
+            .height(viewportClipHeight)
             .graphicsLayer {
                 translationX = viewportX.toPx()
                 translationY = viewportY.toPx()

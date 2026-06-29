@@ -29,6 +29,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -144,6 +145,9 @@ fun FlowtoneApp(
     var miniPlayerExpanded by rememberSaveable {
         mutableStateOf(false)
     }
+    var miniPlayerFullscreen by rememberSaveable {
+        mutableStateOf(false)
+    }
     var miniPlayerMinimized by rememberSaveable {
         mutableStateOf(false)
     }
@@ -194,7 +198,7 @@ fun FlowtoneApp(
     }
     val hasCurrentSong = playerUiState.hasCurrentSong
     val backgroundBlurProgress by animateFloatAsState(
-        targetValue = if (hasCurrentSong && miniPlayerExpanded) 1f else 0f,
+        targetValue = if (hasCurrentSong && (miniPlayerExpanded || miniPlayerFullscreen)) 1f else 0f,
         animationSpec = tween(
             durationMillis = MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS,
             easing = FastOutSlowInEasing
@@ -202,7 +206,7 @@ fun FlowtoneApp(
         label = "MiniPlayerBackgroundBlurProgress"
     )
     val backgroundBlurRadius by animateDpAsState(
-        targetValue = if (hasCurrentSong && miniPlayerExpanded) 12.dp else 0.dp,
+        targetValue = if (hasCurrentSong && (miniPlayerExpanded || miniPlayerFullscreen)) 12.dp else 0.dp,
         animationSpec = tween(
             durationMillis = MINI_PLAYER_EXPAND_ANIMATION_DURATION_MS,
             easing = FastOutSlowInEasing
@@ -283,8 +287,12 @@ fun FlowtoneApp(
         }
     }
 
-    BackHandler(enabled = hasCurrentSong && miniPlayerExpanded) {
-        miniPlayerExpanded = false
+    BackHandler(enabled = hasCurrentSong && (miniPlayerExpanded || miniPlayerFullscreen)) {
+        if (miniPlayerFullscreen) {
+            miniPlayerFullscreen = false
+        } else {
+            miniPlayerExpanded = false
+        }
     }
 
     val navigateBack: () -> Unit = {
@@ -314,6 +322,7 @@ fun FlowtoneApp(
     LaunchedEffect(playerUiState.currentSong) {
         if (playerUiState.currentSong == null) {
             miniPlayerExpanded = false
+            miniPlayerFullscreen = false
             miniPlayerMinimized = false
         }
     }
@@ -328,6 +337,7 @@ fun FlowtoneApp(
                 miniPlayerMinimized = false
                 miniPlayerExpanded = true
             }
+            miniPlayerFullscreen = false
             onOpenExpandedPlayerRequestConsumed()
         } else if (uiState.hasScanned && uiState.songs.isEmpty()) {
             onOpenExpandedPlayerRequestConsumed()
@@ -347,7 +357,7 @@ fun FlowtoneApp(
         showSwipeHint = false
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
@@ -521,6 +531,7 @@ fun FlowtoneApp(
                         indication = null
                     ) {
                         miniPlayerExpanded = false
+                        miniPlayerFullscreen = false
                     }
             )
         }
@@ -530,11 +541,27 @@ fun FlowtoneApp(
             onExpandedChange = { expanded ->
                 if (expanded) {
                     miniPlayerMinimized = false
+                } else {
+                    miniPlayerFullscreen = false
                 }
                 miniPlayerExpanded = expanded
             },
+            fullscreen = miniPlayerFullscreen,
+            onFullscreenChange = { fullscreen ->
+                if (fullscreen) {
+                    miniPlayerExpanded = true
+                    miniPlayerMinimized = false
+                }
+                miniPlayerFullscreen = fullscreen
+            },
+            fullscreenHeight = maxHeight - miniPlayerBottomProtection,
+            allowFullscreenFromCollapsed = false,
+            allowFullscreenFromExpanded = true,
             minimized = miniPlayerMinimized,
             onMinimizedChange = { minimized ->
+                if (minimized) {
+                    miniPlayerFullscreen = false
+                }
                 miniPlayerMinimized = minimized
             },
             onTogglePlayPause = musicViewModel::togglePlayPause,
