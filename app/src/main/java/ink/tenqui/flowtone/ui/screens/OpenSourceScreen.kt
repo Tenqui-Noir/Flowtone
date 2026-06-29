@@ -394,7 +394,7 @@ private fun ComponentDetail(
                 onClick = { context.openExternalUrl(component.projectUrl) }
             )
             ActionCard(
-                text = "查看许可证全文",
+                text = "查看许可证",
                 icon = { Icon(Icons.Rounded.Description, contentDescription = null) },
                 onClick = onShowLicense,
                 modifier = Modifier.padding(top = 10.dp)
