@@ -431,8 +431,8 @@ fun MiniPlayer(
                         !fullscreenInteractionActive &&
                         allowFullscreenFromCollapsed -> {
                         onMinimizedChange(false)
-                        onExpandedChange(true)
                         onFullscreenChange(true)
+                        onExpandedChange(true)
                     }
                     accumulatedDragY <= -fullscreenSwipeThresholdPx &&
                         expanded &&

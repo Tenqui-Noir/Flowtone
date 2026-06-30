@@ -148,6 +148,9 @@ fun FlowtoneApp(
     var miniPlayerFullscreen by rememberSaveable {
         mutableStateOf(false)
     }
+    var miniPlayerFullscreenEnteredFromCollapsed by rememberSaveable {
+        mutableStateOf(false)
+    }
     var miniPlayerMinimized by rememberSaveable {
         mutableStateOf(false)
     }
@@ -168,6 +171,9 @@ fun FlowtoneApp(
     }
     var resumePlaybackAfterCall by rememberSaveable {
         mutableStateOf(appPreferences.shouldResumePlaybackAfterCall())
+    }
+    var allowFullscreenFromCollapsed by rememberSaveable {
+        mutableStateOf(appPreferences.shouldAllowFullscreenFromCollapsed())
     }
     val pagerState = rememberPagerState(
         initialPage = defaultStartPage.index,
@@ -305,10 +311,18 @@ fun FlowtoneApp(
             }
         }
     }
+    val exitMiniPlayerFullscreen: () -> Unit = {
+        miniPlayerFullscreen = false
+        if (miniPlayerFullscreenEnteredFromCollapsed) {
+            miniPlayerExpanded = false
+            miniPlayerMinimized = false
+            miniPlayerFullscreenEnteredFromCollapsed = false
+        }
+    }
     BackHandler(enabled = secondaryPage != null, onBack = navigateBack)
     BackHandler(enabled = hasCurrentSong && (miniPlayerExpanded || miniPlayerFullscreen)) {
         if (miniPlayerFullscreen) {
-            miniPlayerFullscreen = false
+            exitMiniPlayerFullscreen()
         } else {
             miniPlayerExpanded = false
         }
@@ -322,6 +336,7 @@ fun FlowtoneApp(
         if (playerUiState.currentSong == null) {
             miniPlayerExpanded = false
             miniPlayerFullscreen = false
+            miniPlayerFullscreenEnteredFromCollapsed = false
             miniPlayerMinimized = false
         }
     }
@@ -478,6 +493,11 @@ fun FlowtoneApp(
                                 resumePlaybackAfterCall = resume
                                 appPreferences.setResumePlaybackAfterCall(resume)
                             },
+                            allowFullscreenFromCollapsed = allowFullscreenFromCollapsed,
+                            onAllowFullscreenFromCollapsedChange = { allow ->
+                                allowFullscreenFromCollapsed = allow
+                                appPreferences.setAllowFullscreenFromCollapsed(allow)
+                            },
                             elementModifier = ::elementModifier,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -530,7 +550,7 @@ fun FlowtoneApp(
                         indication = null
                     ) {
                         if (miniPlayerFullscreen) {
-                            miniPlayerFullscreen = false
+                            exitMiniPlayerFullscreen()
                         } else {
                             miniPlayerExpanded = false
                         }
@@ -542,7 +562,7 @@ fun FlowtoneApp(
             expanded = miniPlayerExpanded,
             onExpandedChange = { expanded ->
                 if (!expanded && miniPlayerFullscreen) {
-                    miniPlayerFullscreen = false
+                    exitMiniPlayerFullscreen()
                 } else {
                     if (expanded) {
                         miniPlayerMinimized = false
@@ -553,19 +573,23 @@ fun FlowtoneApp(
             fullscreen = miniPlayerFullscreen,
             onFullscreenChange = { fullscreen ->
                 if (fullscreen) {
+                    miniPlayerFullscreenEnteredFromCollapsed = !miniPlayerExpanded
                     miniPlayerExpanded = true
                     miniPlayerMinimized = false
+                    miniPlayerFullscreen = true
+                } else {
+                    exitMiniPlayerFullscreen()
                 }
-                miniPlayerFullscreen = fullscreen
             },
             fullscreenHeight = maxHeight - miniPlayerBottomProtection,
-            allowFullscreenFromCollapsed = false,
+            allowFullscreenFromCollapsed = allowFullscreenFromCollapsed,
             allowFullscreenFromExpanded = true,
             minimized = miniPlayerMinimized,
             onMinimizedChange = { minimized ->
                 if (minimized) {
                     miniPlayerFullscreen = false
                     miniPlayerExpanded = false
+                    miniPlayerFullscreenEnteredFromCollapsed = false
                 }
                 miniPlayerMinimized = minimized
             },
@@ -801,6 +825,8 @@ private fun SettingsScreen(
     onHideSecondaryBackButtonChange: (Boolean) -> Unit,
     resumePlaybackAfterCall: Boolean,
     onResumePlaybackAfterCallChange: (Boolean) -> Unit,
+    allowFullscreenFromCollapsed: Boolean,
+    onAllowFullscreenFromCollapsedChange: (Boolean) -> Unit,
     elementModifier: (Int) -> Modifier,
     modifier: Modifier = Modifier
 ) {
@@ -972,6 +998,36 @@ private fun SettingsScreen(
                 Switch(
                     checked = resumePlaybackAfterCall,
                     onCheckedChange = onResumePlaybackAfterCallChange
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable {
+                        onAllowFullscreenFromCollapsedChange(!allowFullscreenFromCollapsed)
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "\u6b63\u5e38\u6001\u4e0a\u6ed1\u76f4\u8fbe\u5168\u5c4f",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "\u5173\u95ed\u540e\u9700\u8981\u5148\u5c55\u5f00 MiniPlayer\uff0c\u518d\u4e0a\u6ed1\u8fdb\u5165\u5168\u5c4f",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                Switch(
+                    checked = allowFullscreenFromCollapsed,
+                    onCheckedChange = onAllowFullscreenFromCollapsedChange
                 )
             }
         }
