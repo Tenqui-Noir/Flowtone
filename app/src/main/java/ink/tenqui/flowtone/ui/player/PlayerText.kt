@@ -85,7 +85,7 @@ internal fun SharedSongInfo(
     val defaultViewportX = lerpDp(baseViewportX, expandedViewportX, progress)
     val defaultViewportY = lerpDp(baseViewportY, expandedViewportY, progress)
     val defaultViewportWidth = lerpDp(baseViewportWidth, expandedViewportWidth, progress)
-    val fullscreenTitleScale = lerpFloat(1f, 1.7f, fullscreenProgress)
+    val fullscreenTitleScale = lerpFloat(1f, 1.6f, fullscreenProgress)
     val fullscreenArtistScale = lerpFloat(1f, 1.3f, fullscreenProgress)
     val fullscreenArtistAlpha = lerpFloat(1f, 0.8f, fullscreenProgress)
     val fullscreenViewportWidth = ((playerWidth - fullscreenX) / 2f).coerceAtLeast(minMetadataLineWidth)
