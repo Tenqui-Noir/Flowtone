@@ -1,13 +1,17 @@
 package ink.tenqui.flowtone.ui.player
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -38,9 +42,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -49,8 +55,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
 import ink.tenqui.flowtone.core.model.Song
+import ink.tenqui.flowtone.ui.components.FlowtoneMotion
 import ink.tenqui.flowtone.ui.components.SongListItem
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 internal enum class QueueDisplayOrder(val label: String) {
     PlaybackOrder("\u64ad\u653e\u987a\u5e8f"),
@@ -69,6 +78,7 @@ internal fun PlayerQueueBottomSheet(
     isPlaying: Boolean,
     waitForArtworkLoad: Boolean,
     onSongClick: (Song) -> Unit,
+    onDismissStart: () -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -91,6 +101,7 @@ internal fun PlayerQueueBottomSheet(
         if (!dismissStarted) {
             dismissStarted = true
             sheetVisible = false
+            onDismissStart()
         }
     }
 
@@ -103,7 +114,7 @@ internal fun PlayerQueueBottomSheet(
     }
     LaunchedEffect(sheetVisible, dismissStarted) {
         if (dismissStarted && !sheetVisible) {
-            delay(220L)
+            delay(MINI_PLAYER_ANIMATION_DURATION_MS.toLong())
             onDismiss()
         }
     }
@@ -148,16 +159,28 @@ internal fun PlayerQueueBottomSheet(
             visible = sheetVisible,
             modifier = Modifier.align(Alignment.BottomCenter),
             enter = fadeIn(
-                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                animationSpec = tween(
+                    durationMillis = MINI_PLAYER_ANIMATION_DURATION_MS,
+                    easing = MiniPlayerEasing
+                ),
                 initialAlpha = 0f
             ) + slideInVertically(
-                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                animationSpec = tween(
+                    durationMillis = MINI_PLAYER_ANIMATION_DURATION_MS,
+                    easing = MiniPlayerEasing
+                ),
                 initialOffsetY = { fullHeight -> fullHeight + 80 }
             ),
             exit = fadeOut(
-                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                animationSpec = tween(
+                    durationMillis = MINI_PLAYER_ANIMATION_DURATION_MS,
+                    easing = MiniPlayerEasing
+                )
             ) + slideOutVertically(
-                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                animationSpec = tween(
+                    durationMillis = MINI_PLAYER_ANIMATION_DURATION_MS,
+                    easing = MiniPlayerEasing
+                ),
                 targetOffsetY = { fullHeight -> fullHeight + 80 }
             )
         ) {
@@ -230,35 +253,88 @@ internal fun PlayerQueueBottomSheet(
                             )
                         }
                     } else {
-                        LazyColumn(
-                            state = queueListState,
+                        AnimatedContent(
+                            targetState = displayOrder,
+                            transitionSpec = {
+                                EnterTransition.None togetherWith ExitTransition.None
+                            },
+                            label = "QueueDisplayOrderListTransition",
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .nestedScroll(pullToDismissConnection)
-                        ) {
-                            itemsIndexed(
-                                items = displayedQueue,
-                                key = { index, song -> "${song.id}-${song.uri}-$index-${displayOrder.name}" }
-                            ) { index, song ->
-                                val isCurrentSong = when {
-                                    currentSong != null -> song.id == currentSong.id || song.uri == currentSong.uri
-                                    displayOrder == QueueDisplayOrder.PlaybackOrder &&
-                                        currentQueueIndex in playbackQueue.indices -> {
-                                        index == currentQueueIndex
-                                    }
-                                    else -> false
-                                }
+                        ) { animatedOrder ->
+                            val animatedQueue = when (animatedOrder) {
+                                QueueDisplayOrder.PlaybackOrder -> playbackQueue
+                                QueueDisplayOrder.ListOrder -> sourceQueue.ifEmpty { playbackQueue }
+                            }
 
-                                SongListItem(
-                                    song = song,
-                                    isCurrentSong = isCurrentSong,
-                                    onClick = onSongClick,
-                                    titleColor = Color.White,
-                                    artistColor = Color.White,
-                                    durationColor = Color.White,
-                                    modifier = Modifier.padding(vertical = 2.dp)
+                            fun Modifier.queueItemAnimation(animationIndex: Int): Modifier {
+                                val delayMillis = FlowtoneMotion.staggerDelayMillis(animationIndex)
+                                val durationMillis = FlowtoneMotion.staggerDurationMillis(animationIndex)
+                                return animateEnterExit(
+                                    enter = fadeIn(
+                                        tween(
+                                            durationMillis = durationMillis,
+                                            delayMillis = delayMillis,
+                                            easing = FlowtoneMotion.Easing
+                                        )
+                                    ) + slideInVertically(
+                                        animationSpec = tween(
+                                            durationMillis = durationMillis,
+                                            delayMillis = delayMillis,
+                                            easing = FlowtoneMotion.Easing
+                                        )
+                                    ) { it / 6 },
+                                    exit = fadeOut(
+                                        tween(
+                                            durationMillis = durationMillis,
+                                            delayMillis = delayMillis,
+                                            easing = FlowtoneMotion.Easing
+                                        )
+                                    ) + slideOutVertically(
+                                        animationSpec = tween(
+                                            durationMillis = durationMillis,
+                                            delayMillis = delayMillis,
+                                            easing = FlowtoneMotion.Easing
+                                        )
+                                    ) { -it / 6 }
                                 )
+                            }
+
+                            LazyColumn(
+                                state = queueListState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .nestedScroll(pullToDismissConnection)
+                            ) {
+                                itemsIndexed(
+                                    items = animatedQueue,
+                                    key = { index, song -> "${song.id}-${song.uri}-$index-${animatedOrder.name}" }
+                                ) { index, song ->
+                                    val visibleAnimationIndex = (
+                                        index - queueListState.firstVisibleItemIndex
+                                        ).coerceIn(0, 10)
+                                    val isCurrentSong = when {
+                                        currentSong != null -> song.id == currentSong.id || song.uri == currentSong.uri
+                                        animatedOrder == QueueDisplayOrder.PlaybackOrder &&
+                                            currentQueueIndex in playbackQueue.indices -> {
+                                            index == currentQueueIndex
+                                        }
+                                        else -> false
+                                    }
+
+                                    SongListItem(
+                                        song = song,
+                                        isCurrentSong = isCurrentSong,
+                                        onClick = onSongClick,
+                                        titleColor = Color.White,
+                                        artistColor = Color.White,
+                                        durationColor = Color.White,
+                                        modifier = Modifier
+                                            .queueItemAnimation(visibleAnimationIndex)
+                                            .padding(vertical = 2.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -313,6 +389,76 @@ private fun QueueDisplayOrderSelector(
         QueueDisplayOrder.PlaybackOrder -> QueueDisplayOrder.ListOrder
         QueueDisplayOrder.ListOrder -> QueueDisplayOrder.PlaybackOrder
     }
+    var fromOrder by remember { mutableStateOf(selectedOrder) }
+    var toOrder by remember { mutableStateOf(selectedOrder) }
+    val textProgress = remember { Animatable(1f) }
+    val iconProgress = remember { Animatable(1f) }
+    val iconDelayMillis = 72
+    val density = LocalDensity.current
+    val textSlotHeight = 18.dp
+    val slotHeightPx = with(density) { textSlotHeight.toPx() }
+
+    LaunchedEffect(selectedOrder) {
+        if (selectedOrder != fromOrder && selectedOrder != toOrder) {
+            fromOrder = toOrder
+            toOrder = selectedOrder
+            textProgress.snapTo(0f)
+            iconProgress.snapTo(0f)
+        } else if (fromOrder == toOrder && selectedOrder != toOrder) {
+            fromOrder = toOrder
+            toOrder = selectedOrder
+            textProgress.snapTo(0f)
+            iconProgress.snapTo(0f)
+        }
+
+        val targetProgress = if (selectedOrder == toOrder) 1f else 0f
+        val textDistance = if (targetProgress > textProgress.value) {
+            targetProgress - textProgress.value
+        } else {
+            textProgress.value - targetProgress
+        }
+        val textDurationMillis = (MINI_PLAYER_ANIMATION_DURATION_MS * textDistance)
+            .toInt()
+            .coerceAtLeast(1)
+        val delayedIconStartMillis = if (textDurationMillis > iconDelayMillis) {
+            iconDelayMillis
+        } else {
+            textDurationMillis / 2
+        }
+        val iconDurationMillis = (textDurationMillis - delayedIconStartMillis).coerceAtLeast(1)
+
+        coroutineScope {
+            launch {
+                textProgress.animateTo(
+                    targetValue = targetProgress,
+                    animationSpec = tween(
+                        durationMillis = textDurationMillis,
+                        easing = MiniPlayerEasing
+                    )
+                )
+            }
+            launch {
+                iconProgress.animateTo(
+                    targetValue = targetProgress,
+                    animationSpec = tween(
+                        durationMillis = iconDurationMillis,
+                        delayMillis = delayedIconStartMillis,
+                        easing = MiniPlayerEasing
+                    )
+                )
+            }
+        }
+
+        if (selectedOrder == toOrder && textProgress.value >= 0.999f) {
+            fromOrder = toOrder
+            textProgress.snapTo(1f)
+            iconProgress.snapTo(1f)
+        } else if (selectedOrder == fromOrder && textProgress.value <= 0.001f) {
+            toOrder = fromOrder
+            textProgress.snapTo(1f)
+            iconProgress.snapTo(1f)
+        }
+    }
 
     Row(
         modifier = modifier
@@ -322,18 +468,54 @@ private fun QueueDisplayOrderSelector(
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = selectedOrder.label,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.Black
-        )
-        Icon(
-            imageVector = Icons.Rounded.KeyboardArrowDown,
-            contentDescription = "\u5207\u6362\u961f\u5217\u987a\u5e8f",
-            tint = Color.Black.copy(alpha = 0.76f),
+        Box(
+            modifier = Modifier
+                .height(textSlotHeight)
+                .clipToBounds()
+        ) {
+            Text(
+                text = fromOrder.label,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.Black,
+                modifier = Modifier.graphicsLayer {
+                    translationY = slotHeightPx * textProgress.value
+                }
+            )
+            Text(
+                text = toOrder.label,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.Black,
+                modifier = Modifier.graphicsLayer {
+                    translationY = -slotHeightPx * (1f - textProgress.value)
+                }
+            )
+        }
+        Box(
             modifier = Modifier
                 .padding(start = 2.dp)
                 .size(18.dp)
-        )
+                .clipToBounds()
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = "\u5207\u6362\u961f\u5217\u987a\u5e8f",
+                tint = Color.Black.copy(alpha = 0.76f),
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer {
+                        translationY = slotHeightPx * iconProgress.value
+                    }
+            )
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                tint = Color.Black.copy(alpha = 0.76f),
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer {
+                        translationY = -slotHeightPx * (1f - iconProgress.value)
+                    }
+            )
+        }
     }
 }

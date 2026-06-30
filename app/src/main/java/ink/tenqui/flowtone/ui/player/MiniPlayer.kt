@@ -1,7 +1,9 @@
 package ink.tenqui.flowtone.ui.player
 
 import android.util.Log
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -33,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -370,6 +373,7 @@ fun MiniPlayer(
     var keepPlayPauseVisualLockedAfterSeek by remember { mutableStateOf(false) }
     var playPauseVisualLockToken by remember { mutableStateOf(0) }
     var showQueueSheet by rememberSaveable { mutableStateOf(false) }
+    var queueSheetBackgroundBlurred by remember { mutableStateOf(false) }
     val currentSongKey = currentSong?.id?.toString()
     var likedSongKeys by rememberSaveable {
         mutableStateOf(emptyList<String>())
@@ -498,6 +502,20 @@ fun MiniPlayer(
         onSwipeLeft = ::playNextFromMiniPlayer,
         onSwipeRight = ::playPreviousFromMiniPlayer
     )
+    val queueSheetBackgroundBlurProgress = remember { Animatable(0f) }
+    LaunchedEffect(queueSheetBackgroundBlurred) {
+        if (queueSheetBackgroundBlurred) {
+            queueSheetBackgroundBlurProgress.snapTo(0f)
+        }
+        queueSheetBackgroundBlurProgress.animateTo(
+            targetValue = if (queueSheetBackgroundBlurred) 1f else 0f,
+            animationSpec = tween(
+                durationMillis = MINI_PLAYER_ANIMATION_DURATION_MS,
+                easing = LinearEasing
+            )
+        )
+    }
+    val queueSheetBackgroundBlurRadius = 12.dp * queueSheetBackgroundBlurProgress.value
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -516,111 +534,116 @@ fun MiniPlayer(
             bottomEnd = 0.dp
         )
         val playerShadowElevation = lerpDp(0.dp, 18.dp, animationProgress)
-        PlayerDragHandle(
-            animationProgress = animationProgress,
-            hasCurrentSong = hasCurrentSong,
-            expanded = expanded,
-            interactionSource = noRippleInteractionSource,
-            onActivate = {
-                if (minimized) {
-                    onMinimizedChange(false)
-                } else {
-                    onExpandedChange(true)
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(dragHotZoneHeight)
-                .graphicsLayer {
-                    translationY = handleOffsetY.toPx()
-                }
-                .align(Alignment.TopCenter)
-        )
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = visualPanelTop)
-                .fillMaxWidth()
-                .height(visualPanelHeight)
-                .shadow(
-                    elevation = playerShadowElevation,
-                    shape = playerShape,
-                    clip = false
-                )
-                .clickable(
-                    enabled = hasCurrentSong && !expanded,
-                    interactionSource = noRippleInteractionSource,
-                    indication = null
-                ) {
+                .matchParentSize()
+                .blur(queueSheetBackgroundBlurRadius)
+        ) {
+            PlayerDragHandle(
+                animationProgress = animationProgress,
+                hasCurrentSong = hasCurrentSong,
+                expanded = expanded,
+                interactionSource = noRippleInteractionSource,
+                onActivate = {
                     if (minimized) {
                         onMinimizedChange(false)
                     } else {
                         onExpandedChange(true)
                     }
-                }
-        ) {
-            BoxWithConstraints(
+                },
                 modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(visualPanelHeight)
-                .graphicsLayer {
-                    shape = playerShape
-                    clip = true
-                    compositingStrategy = CompositingStrategy.Offscreen
-                }
-                .then(songSwipeModifier)
-                .then(
-                    if (hasArtworkBackground) {
-                            Modifier
-                        } else {
-                            Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        }
+                    .fillMaxWidth()
+                    .height(dragHotZoneHeight)
+                    .graphicsLayer {
+                        translationY = handleOffsetY.toPx()
+                    }
+                    .align(Alignment.TopCenter)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = visualPanelTop)
+                    .fillMaxWidth()
+                    .height(visualPanelHeight)
+                    .shadow(
+                        elevation = playerShadowElevation,
+                        shape = playerShape,
+                        clip = false
                     )
+                    .clickable(
+                        enabled = hasCurrentSong && !expanded,
+                        interactionSource = noRippleInteractionSource,
+                        indication = null
+                    ) {
+                        if (minimized) {
+                            onMinimizedChange(false)
+                        } else {
+                            onExpandedChange(true)
+                        }
+                    }
             ) {
-                val playerWidth = maxWidth
-                Box(
+                BoxWithConstraints(
                     modifier = Modifier
-                        .matchParentSize()
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                )
-                BlurredArtworkBackground(
-                    imageRequest = backgroundImageRequest,
-                    alpha = lerpFloat(0.78f, 0f, animationProgress),
-                    waitForArtworkLoad = useLocalArtworkLoading,
-                    modifier = Modifier.matchParentSize()
-                )
-                CrossfadeFlowCloudBackground(
-                    colors = cloudColors,
-                    progress = animationProgress,
-                    isPlaying = playerUiState.isPlaying,
-                    modifier = Modifier.matchParentSize()
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(Color.Black.copy(alpha = lerpFloat(0.24f, 0.36f, animationProgress)))
-                )
-                val fullscreenProgressTrackWidth = playerWidth * 0.76f
-                val fullscreenArtworkX = (playerWidth - fullscreenProgressTrackWidth) / 2f
-                val fullscreenMetadataTop =
-                    fullscreenCoverCenterY + fullscreenProgressTrackWidth / 2f + 14.dp
-                MorphArtworkLayer(
-                    imageRequest = coverImageRequest,
-                    waitForArtworkLoad = useLocalArtworkLoading,
-                    progress = artworkAnimationProgress,
-                    scaleProgress = artworkScaleProgress,
-                    currentHeight = currentHeight,
-                    viewportHeight = currentHeight,
-                    collapsedHeight = collapsedHeight,
-                    playerWidth = playerWidth,
-                    expandedArtworkSize = expandedArtworkSize,
-                    expandedArtworkTop = expandedArtworkTop,
-                    fullscreenProgress = fullscreenProgress,
-                    fullscreenArtworkSize = fullscreenProgressTrackWidth,
-                    fullscreenArtworkCenterY = fullscreenCoverCenterY,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(visualPanelHeight)
+                    .graphicsLayer {
+                        shape = playerShape
+                        clip = true
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    }
+                    .then(songSwipeModifier)
+                    .then(
+                        if (hasArtworkBackground) {
+                                Modifier
+                            } else {
+                                Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            }
+                        )
+                ) {
+                    val playerWidth = maxWidth
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    )
+                    BlurredArtworkBackground(
+                        imageRequest = backgroundImageRequest,
+                        alpha = lerpFloat(0.78f, 0f, animationProgress),
+                        waitForArtworkLoad = useLocalArtworkLoading,
+                        modifier = Modifier.matchParentSize()
+                    )
+                    CrossfadeFlowCloudBackground(
+                        colors = cloudColors,
+                        progress = animationProgress,
+                        isPlaying = playerUiState.isPlaying,
+                        modifier = Modifier.matchParentSize()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(Color.Black.copy(alpha = lerpFloat(0.24f, 0.36f, animationProgress)))
+                    )
+                    val fullscreenProgressTrackWidth = playerWidth * 0.76f
+                    val fullscreenArtworkX = (playerWidth - fullscreenProgressTrackWidth) / 2f
+                    val fullscreenMetadataTop =
+                        fullscreenCoverCenterY + fullscreenProgressTrackWidth / 2f + 14.dp
+                    MorphArtworkLayer(
+                        imageRequest = coverImageRequest,
+                        waitForArtworkLoad = useLocalArtworkLoading,
+                        progress = artworkAnimationProgress,
+                        scaleProgress = artworkScaleProgress,
+                        currentHeight = currentHeight,
+                        viewportHeight = currentHeight,
+                        collapsedHeight = collapsedHeight,
+                        playerWidth = playerWidth,
+                        expandedArtworkSize = expandedArtworkSize,
+                        expandedArtworkTop = expandedArtworkTop,
+                        fullscreenProgress = fullscreenProgress,
+                        fullscreenArtworkSize = fullscreenProgressTrackWidth,
+                        fullscreenArtworkCenterY = fullscreenCoverCenterY,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
                         .graphicsLayer {
                             translationY = with(density) {
                                 (16.dp * (1f - minimizedProgress) * (1f - fullscreenProgress)).toPx()
@@ -714,6 +737,7 @@ fun MiniPlayer(
                         fullscreenProgress = fullscreenProgress,
                         onToggleLiked = onToggleCurrentSongLiked,
                         onOpenQueue = {
+                            queueSheetBackgroundBlurred = true
                             showQueueSheet = true
                         },
                         modifier = Modifier
@@ -742,6 +766,7 @@ fun MiniPlayer(
                 )
             }
         }
+        }
         if (showQueueSheet) {
             PlayerQueueBottomSheet(
                 playbackQueue = playbackQueue,
@@ -754,6 +779,9 @@ fun MiniPlayer(
                 isPlaying = playerUiState.isPlaying,
                 waitForArtworkLoad = useLocalArtworkLoading,
                 onSongClick = onPlayQueueSong,
+                onDismissStart = {
+                    queueSheetBackgroundBlurred = false
+                },
                 onDismiss = {
                     showQueueSheet = false
                 },
