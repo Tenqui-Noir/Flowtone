@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +43,7 @@ import ink.tenqui.flowtone.ui.components.OptionGroup
 import ink.tenqui.flowtone.ui.components.ThemeModeSelector
 import ink.tenqui.flowtone.ui.components.rightSwipeBackGesture
 import ink.tenqui.flowtone.ui.theme.AppThemeMode
+import kotlin.math.roundToInt
 
 @Composable
 internal fun SettingsScreen(
@@ -207,84 +209,120 @@ private fun PreloadStrengthRow(
     modifier: Modifier = Modifier
 ) {
     val options = listOf(1, 3, 5, 7, 10)
+    val selectedIndex = options.indexOf(selectedCount).takeIf { it != -1 } ?: 2
+    var expanded by rememberSaveable {
+        mutableStateOf(false)
+    }
+    val expandIconRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(280, easing = FlowtonePageEasing),
+        label = "PreloadStrengthExpandIconRotation"
+    )
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        Text(
-            text = "\u9884\u8f7d\u6b4c\u66f2\u5143\u4fe1\u606f\u5f3a\u5ea6",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = "\u63d0\u524d\u52a0\u8f7d\u63a5\u4e0b\u6765\u6b4c\u66f2\u7684\u5c01\u9762\u4e0e\u5143\u4fe1\u606f\uff0c\u51cf\u5c11\u5207\u6b4c\u65f6\u7684\u5c01\u9762\u95ea\u70c1\u3002\u5f3a\u5ea6\u8d8a\u9ad8\uff0c\u5360\u7528\u7684\u5185\u5b58\u4e0e\u540e\u53f0\u52a0\u8f7d\u8d8a\u591a\u3002",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp)
-        )
-        Text(
-            text = "\u5f53\u524d\uff1a$selectedCount \u9996",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 10.dp)
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            options.forEach { count ->
-                val selected = count == selectedCount
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = count.toString(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (selected) {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerHighest
-                            }
-                        )
-                        .clickable { onSelectedCountChange(count) }
-                        .padding(vertical = 9.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    text = "\u9884\u8f7d\u6b4c\u66f2\u5143\u4fe1\u606f\u5f3a\u5ea6",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "\u5f53\u524d\uff1a$selectedCount \u9996",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) "\u6536\u8d77" else "\u5c55\u5f00",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.graphicsLayer { rotationZ = expandIconRotation }
+            )
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(
+                animationSpec = tween(300, easing = FlowtonePageEasing)
+            ) + fadeIn(tween(220, easing = FlowtonePageEasing)),
+            exit = shrinkVertically(
+                animationSpec = tween(300, easing = FlowtonePageEasing)
+            ) + fadeOut(tween(180, easing = FlowtonePageEasing))
         ) {
-            Text(
-                text = "\u4f4e",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "\u4e2d",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "\u9ad8",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
+            ) {
+                Text(
+                    text = "\u63d0\u524d\u52a0\u8f7d\u63a5\u4e0b\u6765\u6b4c\u66f2\u7684\u5c01\u9762\u4e0e\u5143\u4fe1\u606f\uff0c\u51cf\u5c11\u5207\u6b4c\u65f6\u7684\u5c01\u9762\u95ea\u70c1\u3002\u5f3a\u5ea6\u8d8a\u9ad8\uff0c\u5360\u7528\u7684\u5185\u5b58\u4e0e\u540e\u53f0\u52a0\u8f7d\u8d8a\u591a\u3002",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Slider(
+                    value = selectedIndex.toFloat(),
+                    onValueChange = { value ->
+                        val index = value
+                            .roundToInt()
+                            .coerceIn(options.indices)
+                        onSelectedCountChange(options[index])
+                    },
+                    valueRange = 0f..(options.size - 1).toFloat(),
+                    steps = options.size - 2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    options.forEach { count ->
+                        Text(
+                            text = count.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (count == selectedCount) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "\u4f4e",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "\u4e2d",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "\u9ad8",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
