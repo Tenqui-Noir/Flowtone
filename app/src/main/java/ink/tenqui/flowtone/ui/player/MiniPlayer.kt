@@ -46,6 +46,7 @@ import coil3.request.allowHardware
 import coil3.request.crossfade
 import coil3.toBitmap
 import ink.tenqui.flowtone.core.model.SourceType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -173,7 +174,7 @@ fun MiniPlayer(
     val fullscreenCoverCenterY = fullscreenTargetHeight * 0.4f
     val fullscreenStationaryControlsOffsetY =
         (fullscreenTargetHeight - currentHeight) * fullscreenProgress
-    val fullscreenControlsLiftY = 52.dp * fullscreenProgress
+    val fullscreenControlsLiftY = 64.dp * fullscreenProgress
     val visibleProgress by animateFloatAsState(
         targetValue = if (hasCurrentSong) 1f else 0f,
         animationSpec = tween(
@@ -221,7 +222,7 @@ fun MiniPlayer(
         artworkUri?.let { uri ->
             ImageRequest.Builder(context)
                 .data(uri)
-                .size(128, 128)
+                .size(96, 96)
                 .allowHardware(false)
                 .crossfade(false)
                 .build()
@@ -269,7 +270,7 @@ fun MiniPlayer(
                     "coil result songId=${currentSong?.id}, song=${title}, success=${result is SuccessResult}"
                 )
 
-                val bitmap = (result as? SuccessResult)?.image?.toBitmap(128, 128)
+                val bitmap = (result as? SuccessResult)?.image?.toBitmap(96, 96)
                     ?: error("Coil did not return a bitmap image")
                 val seedResult = extractMaterialYouSeedColors(
                     bitmap = bitmap,
@@ -303,6 +304,9 @@ fun MiniPlayer(
                 colors
             }
         }.onFailure { throwable ->
+            if (throwable is CancellationException) {
+                throw throwable
+            }
             Log.w(
                 FLOWTONE_CLOUD_COLORS_TAG,
                 "fallback used for songId=${currentSong?.id}, song=${title}, artworkUri=$artworkUri, " +
