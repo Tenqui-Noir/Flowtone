@@ -39,7 +39,8 @@ fun SongListItem(
     modifier: Modifier = Modifier,
     titleColor: Color? = null,
     artistColor: Color? = null,
-    durationColor: Color? = null
+    durationColor: Color? = null,
+    currentSongBackgroundColor: Color? = null
 ) {
     val contentColor = if (isCurrentSong) {
         MaterialTheme.colorScheme.onSecondaryContainer
@@ -49,7 +50,7 @@ fun SongListItem(
     val rowBackground = if (isCurrentSong) {
         Modifier
             .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(currentSongBackgroundColor ?: MaterialTheme.colorScheme.secondaryContainer)
     } else {
         Modifier
     }

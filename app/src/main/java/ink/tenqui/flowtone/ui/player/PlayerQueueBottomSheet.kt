@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,6 +66,8 @@ internal enum class QueueDisplayOrder(val label: String) {
     PlaybackOrder("\u64ad\u653e\u987a\u5e8f"),
     ListOrder("\u5217\u8868\u987a\u5e8f")
 }
+
+private const val CurrentSongViewportFraction = 0.312f
 
 @Composable
 internal fun PlayerQueueBottomSheet(
@@ -85,15 +88,17 @@ internal fun PlayerQueueBottomSheet(
     var displayOrder by rememberSaveable {
         mutableStateOf(QueueDisplayOrder.PlaybackOrder)
     }
-    val displayedQueue = when (displayOrder) {
-        QueueDisplayOrder.PlaybackOrder -> playbackQueue
-        QueueDisplayOrder.ListOrder -> sourceQueue.ifEmpty { playbackQueue }
-    }
+    val displayedQueue = queueForDisplayOrder(
+        displayOrder = displayOrder,
+        playbackQueue = playbackQueue,
+        sourceQueue = sourceQueue
+    )
     val sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     var sheetVisible by remember { mutableStateOf(false) }
     var dismissStarted by remember { mutableStateOf(false) }
     val noRippleInteractionSource = remember { MutableInteractionSource() }
     val queueListState = rememberLazyListState()
+    var queueViewportHeightPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
     val pullToDismissThresholdPx = with(density) { 64.dp.toPx() }
 
@@ -116,6 +121,35 @@ internal fun PlayerQueueBottomSheet(
         if (dismissStarted && !sheetVisible) {
             delay(MINI_PLAYER_ANIMATION_DURATION_MS.toLong())
             onDismiss()
+        }
+    }
+    LaunchedEffect(
+        sheetVisible,
+        displayOrder,
+        currentQueueIndex,
+        currentSong?.id,
+        currentSong?.uri,
+        playbackQueue.size,
+        sourceQueue.size,
+        queueViewportHeightPx
+    ) {
+        val queue = queueForDisplayOrder(
+            displayOrder = displayOrder,
+            playbackQueue = playbackQueue,
+            sourceQueue = sourceQueue
+        )
+        val currentIndex = currentSongIndexInQueue(
+            displayOrder = displayOrder,
+            queue = queue,
+            currentQueueIndex = currentQueueIndex,
+            currentSong = currentSong
+        )
+        if (sheetVisible && queueViewportHeightPx > 0 && currentIndex != null) {
+            val targetOffsetPx = (queueViewportHeightPx * CurrentSongViewportFraction).toInt()
+            queueListState.scrollToItem(
+                index = currentIndex,
+                scrollOffset = -targetOffsetPx
+            )
         }
     }
     val pullToDismissConnection = remember(queueListState, pullToDismissThresholdPx) {
@@ -305,6 +339,7 @@ internal fun PlayerQueueBottomSheet(
                                 state = queueListState,
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .onSizeChanged { queueViewportHeightPx = it.height }
                                     .nestedScroll(pullToDismissConnection)
                             ) {
                                 itemsIndexed(
@@ -330,6 +365,7 @@ internal fun PlayerQueueBottomSheet(
                                         titleColor = Color.White,
                                         artistColor = Color.White,
                                         durationColor = Color.White,
+                                        currentSongBackgroundColor = Color.Black.copy(alpha = 0.28f),
                                         modifier = Modifier
                                             .queueItemAnimation(visibleAnimationIndex)
                                             .padding(vertical = 2.dp)
@@ -342,6 +378,43 @@ internal fun PlayerQueueBottomSheet(
             }
         }
     }
+}
+
+private fun queueForDisplayOrder(
+    displayOrder: QueueDisplayOrder,
+    playbackQueue: List<Song>,
+    sourceQueue: List<Song>
+): List<Song> {
+    return when (displayOrder) {
+        QueueDisplayOrder.PlaybackOrder -> playbackQueue
+        QueueDisplayOrder.ListOrder -> sourceQueue.ifEmpty { playbackQueue }
+    }
+}
+
+private fun currentSongIndexInQueue(
+    displayOrder: QueueDisplayOrder,
+    queue: List<Song>,
+    currentQueueIndex: Int,
+    currentSong: Song?
+): Int? {
+    if (queue.isEmpty()) {
+        return null
+    }
+
+    if (displayOrder == QueueDisplayOrder.PlaybackOrder && currentQueueIndex in queue.indices) {
+        return currentQueueIndex
+    }
+
+    if (currentSong != null) {
+        val songIndex = queue.indexOfFirst { song ->
+            song.id == currentSong.id || song.uri == currentSong.uri
+        }
+        if (songIndex >= 0) {
+            return songIndex
+        }
+    }
+
+    return null
 }
 
 @Composable
