@@ -11,18 +11,21 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,12 +37,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
@@ -75,7 +74,6 @@ internal fun PlayerQueueBottomSheet(
         QueueDisplayOrder.ListOrder -> sourceQueue.ifEmpty { playbackQueue }
     }
     val sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    val sheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.62f
     var sheetVisible by remember { mutableStateOf(false) }
     var dismissStarted by remember { mutableStateOf(false) }
     val noRippleInteractionSource = remember { MutableInteractionSource() }
@@ -101,7 +99,7 @@ internal fun PlayerQueueBottomSheet(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .clickable(
@@ -110,6 +108,8 @@ internal fun PlayerQueueBottomSheet(
                 onClick = { requestDismiss() }
             )
     ) {
+        val sheetHeight = maxHeight * 0.688f
+
         AnimatedVisibility(
             visible = sheetVisible,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -151,21 +151,31 @@ internal fun PlayerQueueBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .matchParentSize()
-                        .navigationBarsPadding()
                         .padding(start = 16.dp, top = 20.dp, end = 16.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Bottom
                     ) {
-                        Text(
-                            text = "\u64ad\u653e\u961f\u5217",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Text(
+                                text = "\u64ad\u653e\u961f\u5217",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${displayedQueue.size}\u9996",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White.copy(alpha = 0.58f),
+                                modifier = Modifier.padding(start = 6.dp, bottom = 2.dp)
+                            )
+                        }
                         QueueDisplayOrderSelector(
                             selectedOrder = displayOrder,
                             onOrderSelected = { displayOrder = it }
@@ -182,7 +192,7 @@ internal fun PlayerQueueBottomSheet(
                             Text(
                                 text = "\u6682\u65e0\u64ad\u653e\u961f\u5217",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color.White
                             )
                         }
                     } else {
@@ -208,6 +218,9 @@ internal fun PlayerQueueBottomSheet(
                                     song = song,
                                     isCurrentSong = isCurrentSong,
                                     onClick = onSongClick,
+                                    titleColor = Color.White,
+                                    artistColor = Color.White,
+                                    durationColor = Color.White,
                                     modifier = Modifier.padding(vertical = 2.dp)
                                 )
                             }
@@ -234,37 +247,22 @@ private fun PlayerQueueGlassBackground(
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
     ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer {
-                    compositingStrategy = CompositingStrategy.Offscreen
-                }
-                .blur(44.dp)
-        ) {
-            BlurredArtworkBackground(
-                imageRequest = imageRequest,
-                alpha = 0.92f,
-                waitForArtworkLoad = waitForArtworkLoad,
-                modifier = Modifier.matchParentSize()
-            )
-            CrossfadeFlowCloudBackground(
-                colors = cloudColors,
-                progress = progress,
-                isPlaying = isPlaying,
-                alpha = 0.92f,
-                modifier = Modifier.matchParentSize()
-            )
-        }
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.36f))
+        BlurredArtworkBackground(
+            imageRequest = imageRequest,
+            alpha = lerpFloat(0.78f, 0f, progress),
+            waitForArtworkLoad = waitForArtworkLoad,
+            modifier = Modifier.matchParentSize()
+        )
+        CrossfadeFlowCloudBackground(
+            colors = cloudColors,
+            progress = progress,
+            isPlaying = isPlaying,
+            modifier = Modifier.matchParentSize()
         )
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.10f))
+                .background(Color.Black.copy(alpha = lerpFloat(0.24f, 0.36f, progress)))
         )
     }
 }
@@ -275,35 +273,31 @@ private fun QueueDisplayOrderSelector(
     onOrderSelected: (QueueDisplayOrder) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val nextOrder = when (selectedOrder) {
+        QueueDisplayOrder.PlaybackOrder -> QueueDisplayOrder.ListOrder
+        QueueDisplayOrder.ListOrder -> QueueDisplayOrder.PlaybackOrder
+    }
+
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+            .background(Color.White.copy(alpha = 0.82f))
+            .clickable { onOrderSelected(nextOrder) }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        QueueDisplayOrder.entries.forEach { order ->
-            val selected = selectedOrder == order
-            Text(
-                text = order.label,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHighest
-                        }
-                    )
-                    .clickable { onOrderSelected(order) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            )
-        }
+        Text(
+            text = selectedOrder.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.Black
+        )
+        Icon(
+            imageVector = Icons.Rounded.KeyboardArrowDown,
+            contentDescription = "\u5207\u6362\u961f\u5217\u987a\u5e8f",
+            tint = Color.Black.copy(alpha = 0.76f),
+            modifier = Modifier
+                .padding(start = 2.dp)
+                .size(18.dp)
+        )
     }
 }

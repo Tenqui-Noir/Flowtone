@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +36,10 @@ fun SongListItem(
     song: Song,
     isCurrentSong: Boolean,
     onClick: (Song) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    titleColor: Color? = null,
+    artistColor: Color? = null,
+    durationColor: Color? = null
 ) {
     val contentColor = if (isCurrentSong) {
         MaterialTheme.colorScheme.onSecondaryContainer
@@ -71,7 +75,7 @@ fun SongListItem(
             Text(
                 text = song.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = contentColor,
+                color = titleColor ?: contentColor,
                 fontWeight = if (isCurrentSong) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -79,7 +83,7 @@ fun SongListItem(
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isCurrentSong) {
+                color = artistColor ?: if (isCurrentSong) {
                     MaterialTheme.colorScheme.onSecondaryContainer
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -108,7 +112,7 @@ fun SongListItem(
             Text(
                 text = formatDuration(song.durationMs),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isCurrentSong) {
+                color = durationColor ?: if (isCurrentSong) {
                     MaterialTheme.colorScheme.onSecondaryContainer
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
