@@ -1,5 +1,7 @@
 package ink.tenqui.flowtone.app
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -26,6 +28,7 @@ import ink.tenqui.flowtone.ui.player.QueueDisplayOrder
 import ink.tenqui.flowtone.ui.theme.AppThemeMode
 import ink.tenqui.flowtone.viewmodel.MusicUiState
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun FlowtoneScaffold(
     uiState: MusicUiState,
@@ -106,54 +109,59 @@ internal fun FlowtoneScaffold(
                 )
             }
         ) { innerPadding ->
-            Box(
+            SharedTransitionLayout(
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(topBarScrollConnection)
                     .padding(innerPadding)
                     .padding(bottom = miniPlayerContentBottomPadding)
             ) {
-                TopLevelPagerContent(
-                    pagerState = pagerState,
-                    uiState = uiState,
-                    playerUiState = playerUiState,
-                    permissionDenied = permissionDenied,
-                    showSwipeHint = showSwipeHint,
-                    secondaryOpen = secondaryOpen,
-                    onRequestPermission = onRequestPermission,
-                    onSongClick = onSongClick,
-                    onOpenSettings = onOpenSettings,
-                    onOpenAbout = onOpenAbout,
-                    onOpenLocalLibrary = onOpenLocalLibrary,
-                    modifier = Modifier.fillMaxSize()
-                )
-                SecondaryPageHost(
-                    secondaryPage = secondaryPage,
-                    appPreferences = appPreferences,
-                    themeMode = themeMode,
-                    onThemeModeChange = onThemeModeChange,
-                    hideSecondaryBackButton = hideSecondaryBackButton,
-                    onHideSecondaryBackButtonChange = onHideSecondaryBackButtonChange,
-                    resumePlaybackAfterCall = resumePlaybackAfterCall,
-                    onResumePlaybackAfterCallChange = onResumePlaybackAfterCallChange,
-                    allowFullscreenFromCollapsed = allowFullscreenFromCollapsed,
-                    onAllowFullscreenFromCollapsedChange = onAllowFullscreenFromCollapsedChange,
-                    preloadSongMetadataCount = preloadSongMetadataCount,
-                    onPreloadSongMetadataCountChange = onPreloadSongMetadataCountChange,
-                    uiState = uiState,
-                    currentSong = playerUiState.currentSong,
-                    permissionDenied = permissionDenied,
-                    onRequestPermission = onRequestPermission,
-                    onSongClick = onSongClick,
-                    onCloseSecondaryPage = onCloseSecondaryPage,
-                    onSettingsBackActionChange = settingsBackActionChange,
-                    onSettingsPathSegmentsChange = onSettingsPathSegmentsChange,
-                    onOpenSource = onOpenSource,
-                    onOpenSourceBack = onOpenSourceBack,
-                    onOpenSourceBackActionChange = openSourceBackActionChange,
-                    onOpenSourcePathSegmentsChange = onOpenSourcePathSegmentsChange,
-                    modifier = Modifier.fillMaxSize()
-                )
+                val sharedTransitionScope = this
+                Box(modifier = Modifier.fillMaxSize()) {
+                    TopLevelPagerContent(
+                        pagerState = pagerState,
+                        uiState = uiState,
+                        playerUiState = playerUiState,
+                        permissionDenied = permissionDenied,
+                        showSwipeHint = showSwipeHint,
+                        secondaryOpen = secondaryOpen,
+                        onRequestPermission = onRequestPermission,
+                        onSongClick = onSongClick,
+                        onOpenSettings = onOpenSettings,
+                        onOpenAbout = onOpenAbout,
+                        onOpenLocalLibrary = onOpenLocalLibrary,
+                        sharedTransitionScope = sharedTransitionScope,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    SecondaryPageHost(
+                        secondaryPage = secondaryPage,
+                        appPreferences = appPreferences,
+                        themeMode = themeMode,
+                        onThemeModeChange = onThemeModeChange,
+                        hideSecondaryBackButton = hideSecondaryBackButton,
+                        onHideSecondaryBackButtonChange = onHideSecondaryBackButtonChange,
+                        resumePlaybackAfterCall = resumePlaybackAfterCall,
+                        onResumePlaybackAfterCallChange = onResumePlaybackAfterCallChange,
+                        allowFullscreenFromCollapsed = allowFullscreenFromCollapsed,
+                        onAllowFullscreenFromCollapsedChange = onAllowFullscreenFromCollapsedChange,
+                        preloadSongMetadataCount = preloadSongMetadataCount,
+                        onPreloadSongMetadataCountChange = onPreloadSongMetadataCountChange,
+                        uiState = uiState,
+                        currentSong = playerUiState.currentSong,
+                        permissionDenied = permissionDenied,
+                        onRequestPermission = onRequestPermission,
+                        onSongClick = onSongClick,
+                        onCloseSecondaryPage = onCloseSecondaryPage,
+                        onSettingsBackActionChange = settingsBackActionChange,
+                        onSettingsPathSegmentsChange = onSettingsPathSegmentsChange,
+                        onOpenSource = onOpenSource,
+                        onOpenSourceBack = onOpenSourceBack,
+                        onOpenSourceBackActionChange = openSourceBackActionChange,
+                        onOpenSourcePathSegmentsChange = onOpenSourcePathSegmentsChange,
+                        sharedTransitionScope = sharedTransitionScope,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
         if (hasCurrentSong && backgroundBlurProgress > 0.01f) {

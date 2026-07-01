@@ -3,6 +3,8 @@ package ink.tenqui.flowtone.app
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -24,6 +26,7 @@ import ink.tenqui.flowtone.ui.screens.SettingsScreen
 import ink.tenqui.flowtone.ui.theme.AppThemeMode
 import ink.tenqui.flowtone.viewmodel.MusicUiState
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun SecondaryPageHost(
     secondaryPage: SecondaryPage?,
@@ -50,6 +53,7 @@ internal fun SecondaryPageHost(
     onOpenSourceBack: () -> Unit,
     onOpenSourceBackActionChange: ((() -> Unit)?) -> Unit,
     onOpenSourcePathSegmentsChange: (List<String>) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
     modifier: Modifier = Modifier
 ) {
     AnimatedContent(
@@ -133,6 +137,8 @@ internal fun SecondaryPageHost(
                 onOpenSource = onOpenSource,
                 onBack = onCloseSecondaryPage,
                 elementModifier = ::elementModifier,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = this,
                 modifier = Modifier.fillMaxSize()
             )
 

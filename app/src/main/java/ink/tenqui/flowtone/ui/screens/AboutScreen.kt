@@ -2,10 +2,11 @@ package ink.tenqui.flowtone.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,27 +35,27 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ink.tenqui.flowtone.R
+import ink.tenqui.flowtone.ui.components.FlowtoneAboutCard
 import ink.tenqui.flowtone.ui.components.OptionGroup
+import ink.tenqui.flowtone.ui.components.flowtoneAboutCardSharedBounds
+import ink.tenqui.flowtone.ui.components.rememberFlowtoneVersionName
 import ink.tenqui.flowtone.ui.components.rightSwipeBackGesture
 
 private const val GITHUB_URL = "https://github.com/FlowtoneApp/Flowtone"
 private const val GPL_URL = "https://opensource.org/license/gpl-3-0"
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AboutScreen(
     onOpenSource: () -> Unit,
     onBack: () -> Unit,
     elementModifier: (Int) -> Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val versionName = remember(context) {
-        context.packageManager
-            .getPackageInfo(context.packageName, 0)
-            .versionName
-            .orEmpty()
-            .ifBlank { "x.x.x" }
-    }
+    val versionName = rememberFlowtoneVersionName()
 
     Column(
         modifier = modifier
@@ -64,44 +64,18 @@ fun AboutScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        Column(
-            modifier = elementModifier(0)
+        FlowtoneAboutCard(
+            versionName = versionName,
+            description = "@Tenqui Noir",
+            animatedVisibilityScope = animatedVisibilityScope,
+            modifier = Modifier
                 .fillMaxWidth()
                 .height(144.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.Top) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .flowtoneAboutCardSharedBounds(
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
                 )
-                Column(
-                    modifier = Modifier.padding(start = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = "\u58f0\u6d41 / Flowtone",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "v$versionName",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "@Tenqui Noir",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.weight(1f))
+        ) {
             Row(
                 modifier = Modifier
                     .clickable {

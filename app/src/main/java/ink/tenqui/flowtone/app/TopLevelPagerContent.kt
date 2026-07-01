@@ -1,6 +1,8 @@
 package ink.tenqui.flowtone.app
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.LinearEasing
@@ -24,6 +26,7 @@ import ink.tenqui.flowtone.ui.screens.HomeScreen
 import ink.tenqui.flowtone.ui.screens.MineScreen
 import ink.tenqui.flowtone.viewmodel.MusicUiState
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun TopLevelPagerContent(
     pagerState: PagerState,
@@ -37,6 +40,7 @@ internal fun TopLevelPagerContent(
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenLocalLibrary: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
@@ -61,6 +65,7 @@ internal fun TopLevelPagerContent(
                     onOpenSettings = onOpenSettings,
                     onOpenAbout = onOpenAbout,
                     secondaryOpen = secondaryOpen,
+                    sharedTransitionScope = sharedTransitionScope,
                     modifier = Modifier.fillMaxSize()
                 )
             }

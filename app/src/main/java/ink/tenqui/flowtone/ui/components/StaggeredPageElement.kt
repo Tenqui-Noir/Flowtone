@@ -2,6 +2,8 @@ package ink.tenqui.flowtone.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,13 +52,13 @@ fun StaggeredPageElement(
     visible: Boolean,
     animationIndex: Int,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    applyElementMotion: Boolean = true,
+    content: @Composable AnimatedVisibilityScope.() -> Unit
 ) {
     val delayMillis = FlowtoneMotion.staggerDelayMillis(animationIndex)
     val durationMillis = FlowtoneMotion.staggerDurationMillis(animationIndex)
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(
+    val enterTransition = if (applyElementMotion) {
+        fadeIn(
             tween(
                 durationMillis = durationMillis,
                 delayMillis = delayMillis,
@@ -68,8 +70,12 @@ fun StaggeredPageElement(
                 delayMillis = delayMillis,
                 easing = FlowtoneMotion.Easing
             )
-        ) { it / 6 },
-        exit = fadeOut(
+        ) { it / 6 }
+    } else {
+        EnterTransition.None
+    }
+    val exitTransition = if (applyElementMotion) {
+        fadeOut(
             tween(
                 durationMillis = durationMillis,
                 delayMillis = delayMillis,
@@ -81,7 +87,15 @@ fun StaggeredPageElement(
                 delayMillis = delayMillis,
                 easing = FlowtoneMotion.Easing
             )
-        ) { -it / 6 },
+        ) { -it / 6 }
+    } else {
+        ExitTransition.None
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = enterTransition,
+        exit = exitTransition,
         modifier = modifier
     ) {
         content()
