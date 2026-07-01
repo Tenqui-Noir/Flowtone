@@ -1,5 +1,6 @@
 package ink.tenqui.flowtone.ui.player
 
+import android.graphics.Color as AndroidColor
 import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -253,17 +254,23 @@ fun MiniPlayer(
     }
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
     val fallbackSeedColor = MaterialTheme.colorScheme.primary.toArgb()
+    val fallbackSeedColors = remember(currentSong?.id, title, artist, artworkUri, fallbackSeedColor) {
+        songFallbackCloudSeedColors(
+            song = currentSong,
+            fallbackColor = fallbackSeedColor
+        )
+    }
     val fallbackCloudColors = materialYouCloudColors(
-        seedColors = listOf(fallbackSeedColor, fallbackSeedColor, fallbackSeedColor),
+        seedColors = fallbackSeedColors,
         isDarkTheme = isDarkTheme
     )
-    var extractedCloudColors by remember {
-        mutableStateOf<List<Color>?>(null)
+    var cloudColors by remember {
+        mutableStateOf(fallbackCloudColors)
+    }
+    var usingFallbackCloudColors by remember {
+        mutableStateOf(true)
     }
     LaunchedEffect(currentSong?.id, artworkUri, fallbackSeedColor, isDarkTheme) {
-        if (!useLocalArtworkLoading || artworkUri == null) {
-            extractedCloudColors = null
-        }
         Log.d(
             FLOWTONE_CLOUD_COLORS_TAG,
             "start songId=${currentSong?.id}, song=${title}, artworkUri=$artworkUri, " +
@@ -271,16 +278,18 @@ fun MiniPlayer(
         )
 
         if (artworkUri == null || paletteImageRequest == null) {
+            cloudColors = fallbackCloudColors
+            usingFallbackCloudColors = true
             Log.d(
                 FLOWTONE_CLOUD_COLORS_TAG,
                 "fallback used for songId=${currentSong?.id}, song=${title}, reason=artworkUri is null, " +
-                    "path=${CloudColorPath.ThemeFallback.logName}, " +
+                    "path=songFallback, " +
                     "colors=${fallbackCloudColors.joinToString { it.toArgbHex() }}"
             )
             return@LaunchedEffect
         }
 
-        extractedCloudColors = runCatching {
+        runCatching {
             withContext(Dispatchers.Default) {
                 val result = context.imageLoader.execute(paletteImageRequest)
                 Log.d(
@@ -292,7 +301,7 @@ fun MiniPlayer(
                     ?: error("Coil did not return a bitmap image")
                 val seedResult = extractMaterialYouSeedColors(
                     bitmap = bitmap,
-                    fallbackColor = fallbackSeedColor,
+                    fallbackColor = fallbackSeedColors.first(),
                     count = 3
                 )
                 val colors = when (seedResult.colorPath) {
@@ -308,6 +317,8 @@ fun MiniPlayer(
 
                     CloudColorPath.ThemeFallback -> fallbackCloudColors
                 }
+                val usedFallback = seedResult.usedFallback ||
+                    seedResult.colorPath == CloudColorPath.ThemeFallback
                 Log.d(
                     FLOWTONE_CLOUD_COLORS_TAG,
                     "success songId=${currentSong?.id}, song=${title}, artworkUri=$artworkUri, " +
@@ -317,31 +328,35 @@ fun MiniPlayer(
                         "lowChroma=${seedResult.isLowChromaCover}, path=${seedResult.colorPath.logName}, " +
                         "seeds=${seedResult.seedColors.joinToString { it.toArgbHex() }}, " +
                         "colors=${colors.joinToString { it.toArgbHex() }}, " +
-                        "fallback=${seedResult.usedFallback}, reason=${seedResult.fallbackReason.orEmpty()}"
+                        "fallback=${usedFallback}, reason=${seedResult.fallbackReason.orEmpty()}"
                 )
-                colors
+                colors to usedFallback
             }
+        }.onSuccess { (colors, usedFallback) ->
+            cloudColors = colors
+            usingFallbackCloudColors = usedFallback
         }.onFailure { throwable ->
             if (throwable is CancellationException) {
                 throw throwable
             }
+            cloudColors = fallbackCloudColors
+            usingFallbackCloudColors = true
             Log.w(
                 FLOWTONE_CLOUD_COLORS_TAG,
                 "fallback used for songId=${currentSong?.id}, song=${title}, artworkUri=$artworkUri, " +
                     "requestData=${paletteImageRequest.data}, reason=${throwable.message}, " +
-                    "path=${CloudColorPath.ThemeFallback.logName}, " +
+                    "path=songFallback, " +
                     "colors=${fallbackCloudColors.joinToString { it.toArgbHex() }}",
                 throwable
             )
-        }.getOrNull()
+        }
     }
-    val cloudColors = extractedCloudColors ?: fallbackCloudColors
     LaunchedEffect(currentSong?.id, artworkUri, cloudColors) {
         Log.d(
             FLOWTONE_CLOUD_COLORS_TAG,
             "render songId=${currentSong?.id}, song=${title}, artworkUri=$artworkUri, " +
                 "colors=${cloudColors.joinToString { it.toArgbHex() }}, " +
-                "usingFallback=${extractedCloudColors == null}"
+                "usingFallback=$usingFallbackCloudColors"
         )
     }
     val noRippleInteractionSource = remember { MutableInteractionSource() }
@@ -830,4 +845,17 @@ private fun FullscreenCollapseArrow(
                 scaleY = lerpFloat(0.72f, 1f, visibleProgress)
             }
     )
+}
+
+private fun songFallbackCloudSeedColors(
+    song: Song?,
+    fallbackColor: Int
+): List<Int> {
+    song ?: return listOf(fallbackColor, fallbackColor, fallbackColor)
+
+    val baseHash = "${song.id}|${song.title}|${song.artist}|${song.uri}".hashCode()
+    return List(3) { index ->
+        val hue = Math.floorMod(baseHash + index * 47, 360).toFloat()
+        AndroidColor.HSVToColor(floatArrayOf(hue, 0.62f, 0.78f))
+    }
 }

@@ -175,7 +175,11 @@ internal fun neutralCloudColorsFromCover(
     averageLuminance: Float,
     isDarkTheme: Boolean
 ): List<Color> {
-    val base = averageLuminance.coerceIn(0.08f, 0.82f)
+    val base = if (isDarkTheme) {
+        averageLuminance.coerceIn(0.24f, 0.58f)
+    } else {
+        averageLuminance.coerceIn(0.18f, 0.54f)
+    }
 
     return if (isDarkTheme) {
         listOf(

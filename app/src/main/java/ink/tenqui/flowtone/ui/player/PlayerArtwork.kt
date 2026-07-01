@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.asPainter
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -56,10 +59,9 @@ internal fun CrossfadeArtworkImage(
     waitForImageLoad: Boolean = false
 ) {
     val context = LocalContext.current
-    var previousImageRequest by remember { mutableStateOf<ImageRequest?>(null) }
-    var displayedImageRequest by remember {
-        mutableStateOf(if (waitForImageLoad) null else imageRequest)
-    }
+    var previousPainter by remember { mutableStateOf<Painter?>(null) }
+    var displayedPainter by remember { mutableStateOf<Painter?>(null) }
+    var displayedImageRequest by remember { mutableStateOf<ImageRequest?>(null) }
     val crossfadeProgress = remember { Animatable(1f) }
 
     LaunchedEffect(imageRequest, waitForImageLoad) {
@@ -67,18 +69,14 @@ internal fun CrossfadeArtworkImage(
             return@LaunchedEffect
         }
 
-        if (waitForImageLoad && imageRequest != null) {
-            val result = context.imageLoader.execute(imageRequest)
-            if (result !is SuccessResult) {
-                previousImageRequest = displayedImageRequest
-                displayedImageRequest = null
-                crossfadeProgress.snapTo(1f)
-                previousImageRequest = null
-                return@LaunchedEffect
-            }
+        val nextPainter = imageRequest?.let { request ->
+            (context.imageLoader.execute(request) as? SuccessResult)
+                ?.image
+                ?.asPainter(context)
         }
 
-        previousImageRequest = displayedImageRequest
+        previousPainter = displayedPainter
+        displayedPainter = nextPainter
         displayedImageRequest = imageRequest
 
         crossfadeProgress.snapTo(0f)
@@ -90,13 +88,13 @@ internal fun CrossfadeArtworkImage(
             )
         )
 
-        previousImageRequest = null
+        previousPainter = null
     }
 
     Box(modifier = modifier) {
-        previousImageRequest?.let { oldRequest ->
-            AsyncImage(
-                model = oldRequest,
+        previousPainter?.let { oldPainter ->
+            Image(
+                painter = oldPainter,
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 modifier = Modifier
@@ -107,9 +105,9 @@ internal fun CrossfadeArtworkImage(
             )
         }
 
-        displayedImageRequest?.let { request ->
-            AsyncImage(
-                model = request,
+        displayedPainter?.let { painter ->
+            Image(
+                painter = painter,
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 modifier = Modifier

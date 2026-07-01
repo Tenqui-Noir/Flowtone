@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
@@ -188,7 +189,13 @@ internal fun CrossfadeFlowCloudBackground(
             return@LaunchedEffect
         }
 
-        previousColors = displayedColors
+        previousColors = previousColors?.let { oldColors ->
+            blendCloudColors(
+                from = oldColors,
+                to = displayedColors,
+                fraction = crossfadeProgress.value
+            )
+        } ?: displayedColors
         displayedColors = colors
 
         crossfadeProgress.snapTo(0f)
@@ -203,7 +210,24 @@ internal fun CrossfadeFlowCloudBackground(
         previousColors = null
     }
 
+    val baseColors = previousColors?.let { oldColors ->
+        blendCloudColors(
+            from = oldColors,
+            to = displayedColors,
+            fraction = crossfadeProgress.value
+        )
+    } ?: displayedColors
+
     Box(modifier = modifier) {
+        FlowCloudBaseBackground(
+            colors = baseColors,
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    this.alpha = alpha
+                }
+        )
+
         previousColors?.let { oldColors ->
             FlowCloudBackground(
                 colors = oldColors,
@@ -230,12 +254,67 @@ internal fun CrossfadeFlowCloudBackground(
     }
 }
 
+@Composable
+private fun FlowCloudBaseBackground(
+    colors: List<Color>,
+    modifier: Modifier = Modifier
+) {
+    val cloudColors = if (colors.size >= 3) {
+        colors
+    } else {
+        listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.tertiaryContainer
+        )
+    }
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val anchorColor = if (isDarkTheme) {
+        Color(0xFF202431)
+    } else {
+        Color(0xFFDCD8E8)
+    }
+    val tintFraction = if (isDarkTheme) 0.42f else 0.36f
+    val baseColors = cloudColors.take(3).map { color ->
+        lerp(anchorColor, color, tintFraction)
+    }
+
+    Canvas(modifier = modifier) {
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = baseColors,
+                start = Offset(size.width * -0.20f, size.height * 0.10f),
+                end = Offset(size.width * 1.20f, size.height * 0.95f)
+            )
+        )
+    }
+}
+
 private fun reverseDrift(timeMs: Double, oneWayDurationMs: Int): Float {
     val cycleProgress = (timeMs % (oneWayDurationMs * 2.0)) / oneWayDurationMs
     return if (cycleProgress <= 1.0) {
         cycleProgress.toFloat()
     } else {
         (2.0 - cycleProgress).toFloat()
+    }
+}
+
+private fun blendCloudColors(
+    from: List<Color>,
+    to: List<Color>,
+    fraction: Float
+): List<Color> {
+    val safeFraction = fraction.coerceIn(0f, 1f)
+    val fromFallback = from.lastOrNull() ?: Color.Transparent
+    val toFallback = to.lastOrNull() ?: fromFallback
+    val colorCount = maxOf(from.size, to.size, 3)
+
+    return List(colorCount) { index ->
+        lerp(
+            start = from.getOrElse(index) { fromFallback },
+            stop = to.getOrElse(index) { toFallback },
+            fraction = safeFraction
+        )
     }
 }
 
