@@ -66,6 +66,7 @@ import kotlinx.coroutines.withContext
 internal val MiniPlayerCollapsedHeight = 92.dp
 internal val MiniPlayerMinimizedHeight = 52.dp
 internal val MiniPlayerDragHotZoneHeight = 20.dp
+private const val ARTIST_SELECTION_TAG = "FlowtoneArtistSelection"
 
 @Composable
 fun MiniPlayer(
@@ -90,6 +91,7 @@ fun MiniPlayer(
     queueDisplayOrder: QueueDisplayOrder = QueueDisplayOrder.PlaybackOrder,
     onQueueDisplayOrderChange: (QueueDisplayOrder) -> Unit = {},
     onPlayQueueSong: (Song) -> Unit = {},
+    onArtistSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentSong = playerUiState.currentSong
@@ -391,6 +393,7 @@ fun MiniPlayer(
     var playPauseVisualLockToken by remember { mutableStateOf(0) }
     var showQueueSheet by rememberSaveable { mutableStateOf(false) }
     var queueSheetBackgroundBlurred by remember { mutableStateOf(false) }
+    var artistSelectionRequest by remember { mutableStateOf<ArtistSelectionRequest?>(null) }
     val currentSongKey = currentSong?.id?.toString()
     var likedSongKeys by rememberSaveable {
         mutableStateOf(emptyList<String>())
@@ -406,8 +409,36 @@ fun MiniPlayer(
         }
         Unit
     }
+    fun selectArtist(candidate: String, rawArtist: String) {
+        artistSelectionRequest = null
+        Log.d(
+            ARTIST_SELECTION_TAG,
+            "selectedArtist=$candidate, rawArtist=$rawArtist"
+        )
+        onArtistSelected(candidate)
+    }
+    fun handleArtistClick(rawArtist: String) {
+        if (!isSelectableArtist(rawArtist)) {
+            return
+        }
+
+        val candidates = parseArtistCandidates(rawArtist)
+        when (candidates.size) {
+            0 -> Unit
+            1 -> selectArtist(candidates.first(), rawArtist)
+            else -> {
+                artistSelectionRequest = ArtistSelectionRequest(
+                    rawArtist = rawArtist,
+                    candidates = candidates
+                )
+            }
+        }
+    }
     LaunchedEffect(currentSong?.id) {
         isProgressScrubbing = false
+    }
+    LaunchedEffect(currentSong?.id, artist) {
+        artistSelectionRequest = null
     }
     val visualIsPlaying = if (isProgressScrubbing || keepPlayPauseVisualLockedAfterSeek) {
         lockedIsPlayingDuringScrub
@@ -443,68 +474,73 @@ fun MiniPlayer(
         }
     }
     var accumulatedDragY by remember { mutableStateOf(0f) }
-    val gestureModifier = Modifier.pointerInput(
-        hasCurrentSong,
-        expanded,
-        fullscreenInteractionActive,
-        minimized,
-        swipeThresholdPx,
-        fullscreenSwipeThresholdPx,
-        allowFullscreenFromCollapsed,
-        allowFullscreenFromExpanded
-    ) {
-        detectVerticalDragGestures(
-            onDragStart = {
-                accumulatedDragY = 0f
-            },
-            onVerticalDrag = { _, dragAmount ->
-                if (hasCurrentSong) {
-                    accumulatedDragY += dragAmount
+    val playerGesturesEnabled = artistSelectionRequest == null
+    val gestureModifier = if (playerGesturesEnabled) {
+        Modifier.pointerInput(
+            hasCurrentSong,
+            expanded,
+            fullscreenInteractionActive,
+            minimized,
+            swipeThresholdPx,
+            fullscreenSwipeThresholdPx,
+            allowFullscreenFromCollapsed,
+            allowFullscreenFromExpanded
+        ) {
+            detectVerticalDragGestures(
+                onDragStart = {
+                    accumulatedDragY = 0f
+                },
+                onVerticalDrag = { _, dragAmount ->
+                    if (hasCurrentSong) {
+                        accumulatedDragY += dragAmount
+                    }
+                },
+                onDragEnd = {
+                    if (!hasCurrentSong) {
+                        return@detectVerticalDragGestures
+                    }
+                    when {
+                        accumulatedDragY <= -swipeThresholdPx && minimized -> {
+                            onMinimizedChange(false)
+                        }
+                        accumulatedDragY <= -fullscreenSwipeThresholdPx &&
+                            !expanded &&
+                            !fullscreenInteractionActive &&
+                            allowFullscreenFromCollapsed -> {
+                            onMinimizedChange(false)
+                            onFullscreenChange(true)
+                            onExpandedChange(true)
+                        }
+                        accumulatedDragY <= -fullscreenSwipeThresholdPx &&
+                            expanded &&
+                            !fullscreenInteractionActive &&
+                            allowFullscreenFromExpanded -> {
+                            onFullscreenChange(true)
+                        }
+                        accumulatedDragY <= -swipeThresholdPx && !expanded -> {
+                            onExpandedChange(true)
+                        }
+                        accumulatedDragY >= fullscreenSwipeThresholdPx && fullscreenInteractionActive -> {
+                            onFullscreenChange(false)
+                        }
+                        accumulatedDragY >= swipeThresholdPx && expanded && !fullscreenInteractionActive -> {
+                            onExpandedChange(false)
+                        }
+                        accumulatedDragY >= swipeThresholdPx &&
+                            !expanded &&
+                            !fullscreenInteractionActive &&
+                            !minimized -> {
+                            onMinimizedChange(true)
+                        }
+                    }
+                },
+                onDragCancel = {
+                    accumulatedDragY = 0f
                 }
-            },
-            onDragEnd = {
-                if (!hasCurrentSong) {
-                    return@detectVerticalDragGestures
-                }
-                when {
-                    accumulatedDragY <= -swipeThresholdPx && minimized -> {
-                        onMinimizedChange(false)
-                    }
-                    accumulatedDragY <= -fullscreenSwipeThresholdPx &&
-                        !expanded &&
-                        !fullscreenInteractionActive &&
-                        allowFullscreenFromCollapsed -> {
-                        onMinimizedChange(false)
-                        onFullscreenChange(true)
-                        onExpandedChange(true)
-                    }
-                    accumulatedDragY <= -fullscreenSwipeThresholdPx &&
-                        expanded &&
-                        !fullscreenInteractionActive &&
-                        allowFullscreenFromExpanded -> {
-                        onFullscreenChange(true)
-                    }
-                    accumulatedDragY <= -swipeThresholdPx && !expanded -> {
-                        onExpandedChange(true)
-                    }
-                    accumulatedDragY >= fullscreenSwipeThresholdPx && fullscreenInteractionActive -> {
-                        onFullscreenChange(false)
-                    }
-                    accumulatedDragY >= swipeThresholdPx && expanded && !fullscreenInteractionActive -> {
-                        onExpandedChange(false)
-                    }
-                    accumulatedDragY >= swipeThresholdPx &&
-                        !expanded &&
-                        !fullscreenInteractionActive &&
-                        !minimized -> {
-                        onMinimizedChange(true)
-                    }
-                }
-            },
-            onDragCancel = {
-                accumulatedDragY = 0f
-            }
-        )
+            )
+        }
+    } else {
+        Modifier
     }
     val progressGestureStartY =
         expandedProgressTop + fullscreenStationaryControlsOffsetY - fullscreenControlsLiftY
@@ -513,7 +549,7 @@ fun MiniPlayer(
         progressGestureStartY.toPx()..progressGestureEndY.toPx()
     }
     val songSwipeModifier = Modifier.swipeToChangeSong(
-        enabled = hasCurrentSong,
+        enabled = hasCurrentSong && playerGesturesEnabled,
         thresholdPx = songSwipeThresholdPx,
         ignoredStartYRangePx = progressGestureIgnoreRangePx,
         onSwipeLeft = ::playNextFromMiniPlayer,
@@ -689,6 +725,7 @@ fun MiniPlayer(
                         fullscreenX = fullscreenArtworkX,
                         fullscreenTop = fullscreenMetadataTop,
                         switchDirection = collapsedMetadataSwitchDirection,
+                        onArtistClick = ::handleArtistClick,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                     )
@@ -754,6 +791,7 @@ fun MiniPlayer(
                         fullscreenProgress = fullscreenProgress,
                         onToggleLiked = onToggleCurrentSongLiked,
                         onOpenQueue = {
+                            artistSelectionRequest = null
                             queueSheetBackgroundBlurred = true
                             showQueueSheet = true
                         },
@@ -809,8 +847,31 @@ fun MiniPlayer(
                     .zIndex(20f)
             )
         }
+        artistSelectionRequest?.let { request ->
+            ArtistSelectionSheet(
+                rawArtist = request.rawArtist,
+                candidates = request.candidates,
+                overlayHeight = fullscreenHeight,
+                fullscreen = fullscreenProgress > 0.5f,
+                onArtistSelected = { selectedArtist ->
+                    selectArtist(selectedArtist, request.rawArtist)
+                },
+                onDismiss = {
+                    artistSelectionRequest = null
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .zIndex(30f)
+            )
+        }
     }
 }
+
+private data class ArtistSelectionRequest(
+    val rawArtist: String,
+    val candidates: List<String>
+)
 
 @Composable
 private fun FullscreenCollapseArrow(

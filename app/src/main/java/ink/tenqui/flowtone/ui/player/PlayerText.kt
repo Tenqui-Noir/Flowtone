@@ -2,6 +2,7 @@ package ink.tenqui.flowtone.ui.player
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +52,7 @@ internal fun SharedSongInfo(
     fullscreenX: Dp = 0.dp,
     fullscreenTop: Dp = 0.dp,
     switchDirection: Int,
+    onArtistClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val metadataGroupHeight = 60.dp
@@ -114,6 +116,7 @@ internal fun SharedSongInfo(
         blockArtist: String,
         contentAlpha: Float
     ) {
+        val artistClickEnabled = onArtistClick != null && isSelectableArtist(blockArtist)
         val titleWidth = with(density) {
             textMeasurer.measure(
                 text = AnnotatedString(blockTitle),
@@ -225,6 +228,12 @@ internal fun SharedSongInfo(
                     textAlign = metadataTextAlign,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable(
+                            enabled = artistClickEnabled,
+                            onClick = {
+                                onArtistClick?.invoke(blockArtist)
+                            }
+                        )
                         .padding(horizontal = lineHorizontalPadding)
                 )
             }
