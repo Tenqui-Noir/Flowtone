@@ -2,9 +2,6 @@ package ink.tenqui.flowtone.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -27,11 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,34 +34,21 @@ import androidx.compose.ui.unit.dp
 import ink.tenqui.flowtone.R
 import ink.tenqui.flowtone.ui.components.FlowtoneAboutCard
 import ink.tenqui.flowtone.ui.components.OptionGroup
-import ink.tenqui.flowtone.ui.components.flowtoneAboutCardSharedBounds
 import ink.tenqui.flowtone.ui.components.rememberFlowtoneVersionName
 import ink.tenqui.flowtone.ui.components.rightSwipeBackGesture
 
 private const val GITHUB_URL = "https://github.com/FlowtoneApp/Flowtone"
 private const val GPL_URL = "https://opensource.org/license/gpl-3-0"
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AboutScreen(
     onOpenSource: () -> Unit,
     onBack: () -> Unit,
     elementModifier: (Int) -> Modifier,
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    aboutCardElementMotion: Boolean = false,
-    aboutCardContentVisible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val versionName = rememberFlowtoneVersionName()
-    var changingContentReady by remember {
-        mutableStateOf(false)
-    }
-
-    LaunchedEffect(aboutCardContentVisible) {
-        changingContentReady = aboutCardContentVisible
-    }
 
     Column(
         modifier = modifier
@@ -81,23 +60,9 @@ fun AboutScreen(
         FlowtoneAboutCard(
             versionName = versionName,
             description = "@Tenqui Noir",
-            animateChangingContent = true,
-            changingContentVisible = changingContentReady,
-            modifier = (if (aboutCardElementMotion) {
-                elementModifier(0)
-            } else {
-                Modifier
-            })
+            modifier = elementModifier(0)
                 .fillMaxWidth()
                 .height(144.dp)
-                .flowtoneAboutCardSharedBounds(
-                    sharedTransitionScope = if (aboutCardElementMotion) {
-                        null
-                    } else {
-                        sharedTransitionScope
-                    },
-                    animatedVisibilityScope = animatedVisibilityScope
-                )
         ) {
             Row(
                 modifier = Modifier

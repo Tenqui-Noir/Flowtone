@@ -1,9 +1,8 @@
 package ink.tenqui.flowtone.ui.screens
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,57 +28,44 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ink.tenqui.flowtone.ui.components.FlowtoneAboutCard
 import ink.tenqui.flowtone.ui.components.StaggeredPageElement
-import ink.tenqui.flowtone.ui.components.flowtoneAboutCardSharedBounds
-import ink.tenqui.flowtone.ui.components.rememberFlowtoneVersionName
 
-private val MineAboutPreviewCardHeight = 144.dp
+private val MineListeningRecordCardHeight = 132.dp
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun MineScreen(
     onOpenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
     secondaryOpen: Boolean,
-    sharedTransitionScope: SharedTransitionScope? = null,
-    aboutSharedTransitionActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val versionName = rememberFlowtoneVersionName()
-
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         StaggeredPageElement(
-            visible = !secondaryOpen || aboutSharedTransitionActive,
-            animationIndex = 0,
-            applyElementMotion = !aboutSharedTransitionActive
+            visible = !secondaryOpen,
+            animationIndex = 0
         ) {
-            FlowtoneAboutCard(
-                versionName = versionName,
-                description = "",
-                onClick = onOpenAbout,
-                animateChangingContent = aboutSharedTransitionActive,
-                changingContentVisible = !secondaryOpen,
+            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(MineAboutPreviewCardHeight)
-                    .flowtoneAboutCardSharedBounds(
-                        sharedTransitionScope = if (aboutSharedTransitionActive) {
-                            sharedTransitionScope
-                        } else {
-                            null
-                        },
-                        animatedVisibilityScope = this
-                    )
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "声流已为您播放 xx 首歌",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                MineListeningRecordCard(
+                    title = "今日听歌",
+                    value = "0 首",
+                    subtitle = "今日播放记录",
+                    icon = Icons.Rounded.History,
+                    modifier = Modifier.weight(1f)
+                )
+                MineListeningRecordCard(
+                    title = "累计时长",
+                    value = "0 分钟",
+                    subtitle = "听歌时长统计",
+                    icon = Icons.Rounded.Schedule,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -96,6 +84,52 @@ internal fun MineScreen(
             animationIndex = 2,
             onClick = onOpenAbout,
             modifier = Modifier.padding(top = 12.dp)
+        )
+    }
+}
+
+@Composable
+private fun MineListeningRecordCard(
+    title: String,
+    value: String,
+    subtitle: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .height(MineListeningRecordCardHeight)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp)
         )
     }
 }

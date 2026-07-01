@@ -14,11 +14,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -27,13 +22,11 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import ink.tenqui.flowtone.core.model.Song
-import ink.tenqui.flowtone.ui.components.FlowtoneMotion
 import ink.tenqui.flowtone.ui.player.MiniPlayer
 import ink.tenqui.flowtone.ui.player.PlayerUiState
 import ink.tenqui.flowtone.ui.player.QueueDisplayOrder
 import ink.tenqui.flowtone.ui.theme.AppThemeMode
 import ink.tenqui.flowtone.viewmodel.MusicUiState
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -96,20 +89,6 @@ internal fun FlowtoneScaffold(
     modifier: Modifier = Modifier
 ) {
     val hasCurrentSong = playerUiState.hasCurrentSong
-    var keepAboutSharedTransition by remember {
-        mutableStateOf(false)
-    }
-    val aboutSharedTransitionActive =
-        secondaryPage == SecondaryPage.About || keepAboutSharedTransition
-
-    LaunchedEffect(secondaryPage) {
-        if (secondaryPage == SecondaryPage.About) {
-            keepAboutSharedTransition = true
-        } else if (keepAboutSharedTransition) {
-            delay(FlowtoneMotion.DurationMillis.toLong())
-            keepAboutSharedTransition = false
-        }
-    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         Scaffold(
@@ -151,8 +130,6 @@ internal fun FlowtoneScaffold(
                         onOpenSettings = onOpenSettings,
                         onOpenAbout = onOpenAbout,
                         onOpenLocalLibrary = onOpenLocalLibrary,
-                        sharedTransitionScope = sharedTransitionScope,
-                        aboutSharedTransitionActive = aboutSharedTransitionActive,
                         modifier = Modifier.fillMaxSize()
                     )
                     SecondaryPageHost(
@@ -180,7 +157,6 @@ internal fun FlowtoneScaffold(
                         onOpenSourceBack = onOpenSourceBack,
                         onOpenSourceBackActionChange = openSourceBackActionChange,
                         onOpenSourcePathSegmentsChange = onOpenSourcePathSegmentsChange,
-                        sharedTransitionScope = sharedTransitionScope,
                         modifier = Modifier.fillMaxSize()
                     )
                 }

@@ -1,10 +1,5 @@
 package ink.tenqui.flowtone.ui.components
 
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-private const val FlowtoneAboutCardSharedKey = "flowtone-about-card"
 private val FlowtoneAboutCardShape = RoundedCornerShape(24.dp)
 
 @Composable
@@ -47,8 +41,6 @@ internal fun FlowtoneAboutCard(
     description: String,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    animateChangingContent: Boolean = false,
-    changingContentVisible: Boolean = true,
     bottomContent: (@Composable () -> Unit)? = null
 ) {
     val clickableModifier = if (onClick != null) {
@@ -87,73 +79,20 @@ internal fun FlowtoneAboutCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (description.isNotBlank()) {
-                    ChangingCardElement(
-                        visible = changingContentVisible,
-                        animate = animateChangingContent,
-                        animationIndex = 1
-                    ) {
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
 
         if (bottomContent != null) {
             Spacer(modifier = Modifier.weight(1f))
-            ChangingCardElement(
-                visible = changingContentVisible,
-                animate = animateChangingContent,
-                animationIndex = 2
-            ) {
-                Box {
-                    bottomContent()
-                }
+            Box {
+                bottomContent()
             }
         }
-    }
-}
-
-@Composable
-private fun ChangingCardElement(
-    visible: Boolean,
-    animate: Boolean,
-    animationIndex: Int,
-    content: @Composable () -> Unit
-) {
-    if (animate) {
-        StaggeredPageElement(
-            visible = visible,
-            animationIndex = animationIndex
-        ) {
-            content()
-        }
-    } else {
-        content()
-    }
-}
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-internal fun Modifier.flowtoneAboutCardSharedBounds(
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?
-): Modifier {
-    if (sharedTransitionScope == null || animatedVisibilityScope == null) {
-        return this
-    }
-
-    return with(sharedTransitionScope) {
-        val sharedState = rememberSharedContentState(FlowtoneAboutCardSharedKey)
-        this@flowtoneAboutCardSharedBounds.sharedBounds(
-            sharedContentState = sharedState,
-            animatedVisibilityScope = animatedVisibilityScope,
-            enter = EnterTransition.None,
-            exit = ExitTransition.None,
-            clipInOverlayDuringTransition = OverlayClip(FlowtoneAboutCardShape)
-        )
     }
 }

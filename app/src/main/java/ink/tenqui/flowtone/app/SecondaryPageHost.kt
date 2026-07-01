@@ -3,8 +3,6 @@ package ink.tenqui.flowtone.app
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -14,12 +12,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import ink.tenqui.flowtone.core.model.Song
 import ink.tenqui.flowtone.ui.components.FlowtoneMotion
@@ -31,9 +23,7 @@ import ink.tenqui.flowtone.ui.screens.OpenSourceScreen
 import ink.tenqui.flowtone.ui.screens.SettingsScreen
 import ink.tenqui.flowtone.ui.theme.AppThemeMode
 import ink.tenqui.flowtone.viewmodel.MusicUiState
-import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun SecondaryPageHost(
     secondaryPage: SecondaryPage?,
@@ -60,57 +50,27 @@ internal fun SecondaryPageHost(
     onOpenSourceBack: () -> Unit,
     onOpenSourceBackActionChange: ((() -> Unit)?) -> Unit,
     onOpenSourcePathSegmentsChange: (List<String>) -> Unit,
-    sharedTransitionScope: SharedTransitionScope? = null,
     modifier: Modifier = Modifier
 ) {
-    val previousPageHolder = remember {
-        PreviousSecondaryPageHolder(secondaryPage)
-    }
-    val previousPage = previousPageHolder.value
-    val movingBetweenAboutAndOtherSecondary =
-        (previousPage == SecondaryPage.About &&
-            secondaryPage != null &&
-            secondaryPage != SecondaryPage.About) ||
-            (previousPage != null &&
-                previousPage != SecondaryPage.About &&
-                secondaryPage == SecondaryPage.About)
-    var keepAboutCardElementMotion by remember {
-        mutableStateOf(false)
-    }
-    val aboutCardElementMotion =
-        movingBetweenAboutAndOtherSecondary || keepAboutCardElementMotion
-
-    SideEffect {
-        previousPageHolder.value = secondaryPage
-    }
-
-    LaunchedEffect(secondaryPage) {
-        if (movingBetweenAboutAndOtherSecondary) {
-            keepAboutCardElementMotion = true
-            delay(FlowtoneMotion.DurationMillis.toLong())
-            keepAboutCardElementMotion = false
-        } else {
-            keepAboutCardElementMotion = false
-        }
-    }
-
     AnimatedContent(
         targetState = secondaryPage,
         transitionSpec = {
-            val usesAboutSharedElement =
+            val usesAboutFade =
                 (initialState == null && targetState == SecondaryPage.About) ||
                     (initialState == SecondaryPage.About && targetState == null)
 
-            if (usesAboutSharedElement) {
-                EnterTransition.None togetherWith (
-                    fadeOut(
-                        animationSpec = tween(
-                            durationMillis = FlowtoneMotion.DurationMillis,
-                            easing = FlowtonePageEasing
-                        ),
-                        targetAlpha = 1f
-                    ) + ExitTransition.KeepUntilTransitionsFinished
+            if (usesAboutFade) {
+                fadeIn(
+                    tween(
+                        durationMillis = FlowtoneMotion.DurationMillis,
+                        easing = FlowtonePageEasing
                     )
+                ) togetherWith fadeOut(
+                    tween(
+                        durationMillis = FlowtoneMotion.DurationMillis,
+                        easing = FlowtonePageEasing
+                    )
+                )
             } else {
                 EnterTransition.None togetherWith ExitTransition.None
             }
@@ -191,10 +151,6 @@ internal fun SecondaryPageHost(
                 onOpenSource = onOpenSource,
                 onBack = onCloseSecondaryPage,
                 elementModifier = ::elementModifier,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = this,
-                aboutCardElementMotion = aboutCardElementMotion,
-                aboutCardContentVisible = secondaryPage == SecondaryPage.About,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -222,7 +178,3 @@ internal fun SecondaryPageHost(
         }
     }
 }
-
-private class PreviousSecondaryPageHolder(
-    var value: SecondaryPage?
-)
