@@ -52,15 +52,16 @@ internal fun MineScreen(
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         StaggeredPageElement(
-            visible = !secondaryOpen,
+            visible = !secondaryOpen || aboutSharedTransitionActive,
             animationIndex = 0,
             applyElementMotion = !aboutSharedTransitionActive
         ) {
             FlowtoneAboutCard(
                 versionName = versionName,
-                description = "声流已为您播放 xx 首歌",
+                description = "",
                 onClick = onOpenAbout,
-                animatedVisibilityScope = this,
+                animateChangingContent = aboutSharedTransitionActive,
+                changingContentVisible = !secondaryOpen,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(MineAboutPreviewCardHeight)
@@ -72,7 +73,13 @@ internal fun MineScreen(
                         },
                         animatedVisibilityScope = this
                     )
-            )
+            ) {
+                Text(
+                    text = "声流已为您播放 xx 首歌",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         MineMenuItem(
             title = "\u8bbe\u7f6e",

@@ -97,7 +97,23 @@ internal fun SecondaryPageHost(
     AnimatedContent(
         targetState = secondaryPage,
         transitionSpec = {
-            EnterTransition.None togetherWith ExitTransition.None
+            val usesAboutSharedElement =
+                (initialState == null && targetState == SecondaryPage.About) ||
+                    (initialState == SecondaryPage.About && targetState == null)
+
+            if (usesAboutSharedElement) {
+                EnterTransition.None togetherWith (
+                    fadeOut(
+                        animationSpec = tween(
+                            durationMillis = FlowtoneMotion.DurationMillis,
+                            easing = FlowtonePageEasing
+                        ),
+                        targetAlpha = 1f
+                    ) + ExitTransition.KeepUntilTransitionsFinished
+                    )
+            } else {
+                EnterTransition.None togetherWith ExitTransition.None
+            }
         },
         label = "SecondaryContentTransition",
         modifier = modifier
@@ -178,6 +194,7 @@ internal fun SecondaryPageHost(
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this,
                 aboutCardElementMotion = aboutCardElementMotion,
+                aboutCardContentVisible = secondaryPage == SecondaryPage.About,
                 modifier = Modifier.fillMaxSize()
             )
 

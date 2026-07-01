@@ -47,7 +47,8 @@ internal fun FlowtoneAboutCard(
     description: String,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    animateChangingContent: Boolean = false,
+    changingContentVisible: Boolean = true,
     bottomContent: (@Composable () -> Unit)? = null
 ) {
     val clickableModifier = if (onClick != null) {
@@ -55,12 +56,6 @@ internal fun FlowtoneAboutCard(
     } else {
         Modifier
     }
-    val descriptionMotionModifier = animatedVisibilityScope?.run {
-        staggeredPageElementModifier(animationIndex = 1)
-    } ?: Modifier
-    val bottomMotionModifier = animatedVisibilityScope?.run {
-        staggeredPageElementModifier(animationIndex = 2)
-    } ?: Modifier
 
     Column(
         modifier = modifier
@@ -91,21 +86,53 @@ internal fun FlowtoneAboutCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = descriptionMotionModifier
-                )
+                if (description.isNotBlank()) {
+                    ChangingCardElement(
+                        visible = changingContentVisible,
+                        animate = animateChangingContent,
+                        animationIndex = 1
+                    ) {
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
 
         if (bottomContent != null) {
             Spacer(modifier = Modifier.weight(1f))
-            Box(modifier = bottomMotionModifier) {
-                bottomContent()
+            ChangingCardElement(
+                visible = changingContentVisible,
+                animate = animateChangingContent,
+                animationIndex = 2
+            ) {
+                Box {
+                    bottomContent()
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun ChangingCardElement(
+    visible: Boolean,
+    animate: Boolean,
+    animationIndex: Int,
+    content: @Composable () -> Unit
+) {
+    if (animate) {
+        StaggeredPageElement(
+            visible = visible,
+            animationIndex = animationIndex
+        ) {
+            content()
+        }
+    } else {
+        content()
     }
 }
 
