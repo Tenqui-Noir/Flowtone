@@ -90,10 +90,13 @@ fun FlowtoneApp(
     var secondaryPage by rememberSaveable {
         mutableStateOf<SecondaryPage?>(null)
     }
+    var settingsBackAction by remember {
+        mutableStateOf<(() -> Unit)?>(null)
+    }
     var openSourceBackAction by remember {
         mutableStateOf<(() -> Unit)?>(null)
     }
-    var openSourcePathSegments by remember {
+    var secondaryPathSegments by remember {
         mutableStateOf(emptyList<String>())
     }
     var hideSecondaryBackButton by rememberSaveable {
@@ -232,7 +235,14 @@ fun FlowtoneApp(
     }
 
     val navigateBack: () -> Unit = {
-        if (secondaryPage == SecondaryPage.OpenSource) {
+        if (secondaryPage == SecondaryPage.Settings) {
+            val nestedBackAction = settingsBackAction
+            if (nestedBackAction != null) {
+                nestedBackAction()
+            } else {
+                secondaryPage = null
+            }
+        } else if (secondaryPage == SecondaryPage.OpenSource) {
             val nestedBackAction = openSourceBackAction
             if (nestedBackAction != null) {
                 nestedBackAction()
@@ -322,7 +332,7 @@ fun FlowtoneApp(
         pagerState = pagerState,
         selectedTopLevelPage = selectedTopLevelPage,
         secondaryPage = secondaryPage,
-        openSourcePathSegments = openSourcePathSegments,
+        secondaryPathSegments = secondaryPathSegments,
         hideSecondaryBackButton = hideSecondaryBackButton,
         onHideSecondaryBackButtonChange = { hide ->
             hideSecondaryBackButton = hide
@@ -348,11 +358,21 @@ fun FlowtoneApp(
             playbackQueueDisplayOrder = order
             appPreferences.setPlaybackQueueDisplayOrder(order)
         },
-        openSourceBackActionChange = { action ->
+        settingsBackActionChange = { action ->
+            settingsBackAction = action
+        },
+        onSettingsPathSegmentsChange = { segments ->
+            if (secondaryPage == SecondaryPage.Settings) {
+                secondaryPathSegments = segments
+            }
+        },
+        openSourceBackActionChange = { action -> 
             openSourceBackAction = action
         },
         onOpenSourcePathSegmentsChange = { segments ->
-            openSourcePathSegments = segments
+            if (secondaryPage == SecondaryPage.OpenSource) {
+                secondaryPathSegments = segments
+            }
         },
         permissionDenied = permissionDenied,
         showSwipeHint = showSwipeHint,
@@ -370,20 +390,26 @@ fun FlowtoneApp(
         onNavigateBack = navigateBack,
         onCloseSecondaryPage = {
             secondaryPage = null
+            secondaryPathSegments = emptyList()
         },
         onOpenSettings = {
+            secondaryPathSegments = emptyList()
             secondaryPage = SecondaryPage.Settings
         },
         onOpenAbout = {
+            secondaryPathSegments = emptyList()
             secondaryPage = SecondaryPage.About
         },
         onOpenLocalLibrary = {
+            secondaryPathSegments = emptyList()
             secondaryPage = SecondaryPage.LocalLibrary
         },
         onOpenSource = {
+            secondaryPathSegments = emptyList()
             secondaryPage = SecondaryPage.OpenSource
         },
         onOpenSourceBack = {
+            secondaryPathSegments = emptyList()
             secondaryPage = SecondaryPage.About
         },
         onRequestPermission = {

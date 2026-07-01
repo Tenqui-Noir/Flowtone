@@ -4,16 +4,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ink.tenqui.flowtone.ui.components.StaggeredPageElement
@@ -32,12 +40,14 @@ internal fun MineScreen(
     ) {
         MineMenuItem(
             title = "\u8bbe\u7f6e",
+            icon = Icons.Rounded.Settings,
             visible = !secondaryOpen,
             animationIndex = 0,
             onClick = onOpenSettings
         )
         MineMenuItem(
             title = "\u5173\u4e8e",
+            icon = Icons.Rounded.Info,
             visible = !secondaryOpen,
             animationIndex = 1,
             onClick = onOpenAbout,
@@ -49,6 +59,7 @@ internal fun MineScreen(
 @Composable
 private fun MineMenuItem(
     title: String,
+    icon: ImageVector,
     visible: Boolean,
     animationIndex: Int,
     onClick: () -> Unit,
@@ -68,6 +79,13 @@ private fun MineMenuItem(
                 .padding(horizontal = 20.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,

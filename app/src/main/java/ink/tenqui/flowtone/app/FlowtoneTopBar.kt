@@ -42,7 +42,7 @@ internal fun FlowtoneTopBar(
     modifier: Modifier = Modifier
 ) {
     val pathSegments = when (secondaryPage) {
-        SecondaryPage.Settings -> listOf(SecondaryPage.Settings.title)
+        SecondaryPage.Settings -> listOf(SecondaryPage.Settings.title) + additionalPathSegments
         SecondaryPage.About -> listOf(SecondaryPage.About.title)
         SecondaryPage.LocalLibrary -> listOf(SecondaryPage.LocalLibrary.title)
         SecondaryPage.OpenSource -> listOf(
